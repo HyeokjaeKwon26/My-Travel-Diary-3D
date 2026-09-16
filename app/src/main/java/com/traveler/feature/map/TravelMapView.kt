@@ -103,7 +103,6 @@ fun TravelMapView(
         }
     }
 
-    var mapBuffering by remember { mutableStateOf(false) }
     var isPlaying by remember(initialIsPlaying) { mutableStateOf(initialIsPlaying) }
     var playbackProgress by remember(initialPlaybackProgress) { mutableStateOf(initialPlaybackProgress) }
     var playbackSpeed by remember { mutableStateOf(1.0f) }
@@ -160,8 +159,8 @@ fun TravelMapView(
     }
 
     // Playback loop driven by monotonic clock and withFrameNanos (P1-05)
-    LaunchedEffect(isPlaying, mapBuffering, initialPlaybackProgress, timeTracker) {
-        if (isPlaying && !mapBuffering) {
+    LaunchedEffect(isPlaying, initialPlaybackProgress, timeTracker) {
+        if (isPlaying) {
             if (isMusicEnabled) {
                 soundtrackPlayer.start()
             }
@@ -194,7 +193,7 @@ fun TravelMapView(
         // clipping layer covers its separate GPU surface on some Android versions.
         modifier = modifier
     ) {
-        com.traveler.feature.map.threed.Map3DLayer(renderModel, storyTimeline, currentActiveState, isPlaying, onBuffering = { mapBuffering = it }) {
+        com.traveler.feature.map.threed.Map3DLayer(renderModel, storyTimeline, currentActiveState, isPlaying) {
     LaunchedEffect(Unit) {
         if (!RegionalBasemapCache.isReady) {
             val prep = RegionalBasemapCache.ensureLoaded(context.applicationContext)
@@ -566,7 +565,7 @@ fun TravelMapView(
                             .clickable {
                                 isMusicEnabled = !isMusicEnabled
                                 soundtrackPlayer.isEnabled = isMusicEnabled
-                                if (isMusicEnabled && isPlaying && !mapBuffering) {
+                                if (isMusicEnabled && isPlaying) {
                                     soundtrackPlayer.resume()
                                 } else {
                                     soundtrackPlayer.pause()

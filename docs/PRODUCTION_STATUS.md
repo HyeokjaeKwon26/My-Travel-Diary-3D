@@ -1,6 +1,16 @@
-# 1.0.0-rc5 implementation and acceptance status
+# 1.0.0-rc6 implementation and acceptance status
 
 Date: 2026-09-16 (local). Target phone: Galaxy S23 Ultra. The user could not connect the phone during this session. This release candidate can be installed and used, but it is not a declaration that every criterion in the production readiness plan has passed.
+
+## RC6 playback and map bounds correction
+
+The user's 2D screenshot showed map outlines behind the diary. The shared parent intentionally had no Compose clipping because that previously hid the GLES SurfaceView, but the native 2D renderer had no separate clip. `TravelMapRenderer.render` now saves/restores Canvas state and clips every draw to its viewport. The diary also paints its own background; 3D's SurfaceView parent remains unchanged.
+
+Removed the network buffer gate and GPU map-readiness gate from live story/music playback. Missing tiles are a status only. Live atlas rasterization, tile compositing and local base-mesh construction run on a single bounded worker. Pending work is replaced with the newest viewport; stale completed viewports are discarded. Tile coverage compares sets, not request order. Reference rasters, base meshes, bitmap buffers and GPU texture storage are reused. Preparation is coalesced to at most five starts per second and completion wakes a paused view. Exports retain synchronous frame preparation with the same map projection and frozen cache.
+
+The renderer still uses a 2048-pixel atlas and the same detailed-map source. There is no route prefetch, paid provider, new permission, database schema change, or change to recorded travel data. Version code 7 uses the existing production signing identity. The original 2D repository is untouched.
+
+Validation results for RC6 will be recorded after final acceptance. Historical RC5 buffering behavior below is superseded by RC6.
 
 ## RC5 adaptive journey update
 

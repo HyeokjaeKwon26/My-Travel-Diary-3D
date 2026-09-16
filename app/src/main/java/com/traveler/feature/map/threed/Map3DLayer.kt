@@ -22,7 +22,7 @@ import com.traveler.feature.map.story.TravelStoryTimeline
 import kotlinx.coroutines.*
 
 @Composable
-fun Map3DLayer(model:TravelMapRenderModel,timeline:TravelStoryTimeline,state:TravelPlaybackState?, playing:Boolean=false,onBuffering:(Boolean)->Unit={},
+fun Map3DLayer(model:TravelMapRenderModel,timeline:TravelStoryTimeline,state:TravelPlaybackState?, playing:Boolean=false,
                fallback:@Composable ()->Unit) {
     val context=LocalContext.current
     val scope=rememberCoroutineScope()
@@ -77,8 +77,8 @@ fun Map3DLayer(model:TravelMapRenderModel,timeline:TravelStoryTimeline,state:Tra
     }
     Box(Modifier.fillMaxSize()) {
         if(use3D) {
-            if(scene!=null) Travel3DSurface(scene!!,state,calm,Modifier.fillMaxSize(),mapScale,internetMaps,{mapStatus=it},onBuffering,{sceneReady=it}) {
-                message=it;use3D=false;onBuffering(false)
+            if(scene!=null) Travel3DSurface(scene!!,state,calm,Modifier.fillMaxSize(),mapScale,internetMaps,{mapStatus=it},{sceneReady=it}) {
+                message=it;use3D=false
             } else CircularProgressIndicator(Modifier.align(Alignment.Center))
         } else fallback()
         if(use3D && !sceneReady) Column(Modifier.align(Alignment.Center),horizontalAlignment=Alignment.CenterHorizontally) {
@@ -120,7 +120,7 @@ fun Map3DLayer(model:TravelMapRenderModel,timeline:TravelStoryTimeline,state:Tra
             Text("Terrain storage: %.1f MB / %d MB".format(storedBytes/1_000_000.0,limitMb),fontSize=12.sp)
             Row { listOf(100,200,500).forEach { mb -> TextButton(onClick={action { JourneyTerrain.setBudget(context,mb);limitMb=mb }}) { Text("$mb MB") } } }
             TextButton(onClick={action { plan?.let { JourneyTerrain.pause(context,it.key) };JourneyTerrain.clearTemporary(context);plan?.let { packs=JourneyTerrain.load(context,it.key) } }}) { Text("Clear temporary terrain") }
-            TextButton(onClick={use3D=!use3D;if(!use3D)onBuffering(false)}) { Text(if(use3D) "Switch to 2D map" else "Switch to 3D map") }
+            TextButton(onClick={use3D=!use3D}) { Text(if(use3D) "Switch to 2D map" else "Switch to 3D map") }
             Text("Camera: north up. The map follows your location without rotating or arrival zooms.",fontSize=12.sp)
             Text("Automatic route framing · no pinch zoom. The same framing is used in your video.",fontSize=12.sp)
             Row(verticalAlignment=Alignment.CenterVertically) {

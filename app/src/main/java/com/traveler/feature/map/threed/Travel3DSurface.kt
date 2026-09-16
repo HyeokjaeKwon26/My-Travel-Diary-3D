@@ -14,13 +14,12 @@ import javax.microedition.khronos.opengles.GL10
 
 @Composable
 fun Travel3DSurface(scene: SceneGeometry, state: TravelPlaybackState?, calm: Boolean, modifier: Modifier,
-                    mapScale:Double=1.0, internetMaps:Boolean=true,onMapStatus:(String)->Unit={},onBuffering:(Boolean)->Unit={},onReady:(Boolean)->Unit={},
+                    mapScale:Double=1.0, internetMaps:Boolean=true,onMapStatus:(String)->Unit={},onReady:(Boolean)->Unit={},
                     onError: (String) -> Unit) {
     val context=LocalContext.current
     val lifecycle=LocalLifecycleOwner.current.lifecycle
     val errorCallback by rememberUpdatedState(onError)
     val readyCallback by rememberUpdatedState(onReady)
-    val bufferCallback by rememberUpdatedState(onBuffering)
     val mapStatusCallback by rememberUpdatedState(onMapStatus)
     val bridge=remember(scene) { SceneBridge(context,scene) { message -> errorCallback(message) } }
     val surface=remember(scene) {
@@ -43,7 +42,6 @@ fun Travel3DSurface(scene: SceneGeometry, state: TravelPlaybackState?, calm: Boo
         bridge.onReady={readyCallback(it)}
         bridge.mapChanged={
             mapStatusCallback(bridge.streetStatus())
-            bufferCallback(bridge.buffering())
             surface.requestRender()
             surface.removeCallbacks(bridge.refresh)
             surface.postDelayed(bridge.refresh,400)
@@ -82,11 +80,9 @@ private class SceneBridge(val context: android.content.Context,val scene: SceneG
     var mapChanged:()->Unit={}
     var refreshAction:()->Unit={}
     val refresh=Runnable { refreshAction() }
-    private var lastBuffering=false
-    fun buffering()=(streets?.buffering == true) || ((streets?.detailCount ?: 0)>0 && renderer?.mapFrameReady==false)
     fun streetStatus()=streets?.status ?: "Reference map · loading street detail"
     fun updateNetwork() { streets?.setActive(internetMaps && resumed) }
-    fun stopNetwork() { streets?.close() }
+    fun stopNetwork() { resumed=false;streets?.close() }
     val quality=RenderQuality((context.getSystemService(android.content.Context.ACTIVITY_SERVICE) as android.app.ActivityManager).isLowRamDevice)
     var onQuality:(Float)->Unit={}
     private val power=context.getSystemService(android.content.Context.POWER_SERVICE) as android.os.PowerManager
@@ -97,10 +93,11 @@ private class SceneBridge(val context: android.content.Context,val scene: SceneG
         try {
             firstFrame=true
             main.post { onReady(false) }
+            renderer?.release()
             streets?.close()
             val session=StreetMapSession(context,network=true) { main.post { mapChanged() } }
             streets=session;updateNetwork()
-            renderer=TravelGlRenderer(context,scene,session).also { it.initialize() }
+            renderer=TravelGlRenderer(context,scene,session,asyncMaps=true,onMapReady={ main.post { if(resumed) refreshAction() } }).also { it.initialize() }
         }
         catch(e:Exception) { main.post { onError(e.message ?: "3D unavailable on this device") } }
     }
@@ -109,14 +106,11 @@ private class SceneBridge(val context: android.content.Context,val scene: SceneG
         try {
             val started=System.nanoTime()
             renderer?.render(width,height,state,calm,mapScale,maxOf(width,detailWidth),maxOf(height,detailHeight))
-            if(renderer!=null && firstFrame) { firstFrame=false;main.post { onReady(true) } }
-            val waiting=buffering()
-            if(waiting!=lastBuffering) { lastBuffering=waiting;main.post { mapChanged() } }
-            if(waiting) main.postDelayed({ refreshAction() },200)
+            if(renderer?.mapAvailable==true && firstFrame) { firstFrame=false;main.post { onReady(true) } }
             val thermal=android.os.Build.VERSION.SDK_INT>=29 && power.currentThermalStatus>=android.os.PowerManager.THERMAL_STATUS_MODERATE
             if(quality.observe((System.nanoTime()-started)/1_000_000.0,thermal)) onQuality(quality.scale)
         }
-        catch(e:Exception) { renderer=null; main.post { onError(e.message ?: "3D rendering failed") } }
+        catch(e:Exception) { renderer?.release();renderer=null; main.post { onError(e.message ?: "3D rendering failed") } }
     }
     fun release() { renderer?.release();renderer=null }
 }

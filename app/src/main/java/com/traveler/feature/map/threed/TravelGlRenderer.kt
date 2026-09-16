@@ -17,16 +17,20 @@ import kotlin.math.*
 
 /** The same renderer runs on GLSurfaceView and the video encoder EGL surface. */
 class TravelGlRenderer(private val context: Context, val scene: SceneGeometry,
-                       val streets:StreetMapSession=StreetMapSession(context)) {
+                       val streets:StreetMapSession=StreetMapSession(context),
+                       private val asyncMaps:Boolean=false,private val onMapReady:()->Unit={}) {
     private var program = 0
     private var texture = 0
     private var mapTexture = 0
     private lateinit var mapDrape: OfflineMapDrape
     private var mapWindow: OfflineMapDrape.Window? = null
-    private var referenceRaster:android.graphics.Bitmap?=null
+    private lateinit var atlasPainter:MapAtlasPainter
+    private var atlasWorker:MapAtlasWorker?=null
+    private var requestedWindow:OfflineMapDrape.Window?=null
+    private var textureAllocated=false
     private var mapRevision=-1L
-    private var lastMapUpload=0L
-    private var paintedTiles=emptyList<StreetTile>()
+    private var paintedTiles=emptySet<StreetTile>()
+    @Volatile var mapAvailable=false;private set
     @Volatile var mapFrameReady=false;private set
     private var localBase: Mesh? = null
     private var mapBoundsUniform = 0
@@ -97,6 +101,9 @@ class TravelGlRenderer(private val context: Context, val scene: SceneGeometry,
             GLUtils.texImage2D(GL.GL_TEXTURE_2D,0,bmp,0); bmp.recycle()
         }
         mapDrape=OfflineMapDrape(context)
+        atlasPainter=MapAtlasPainter(context,streets)
+        if(asyncMaps) atlasWorker=MapAtlasWorker(atlasPainter::prepare,
+            { atlasPainter.recycle(it.bitmap) },atlasPainter::close,onMapReady)
         GL.glGenTextures(1,ids,0);mapTexture=ids[0]
         GL.glBindTexture(GL.GL_TEXTURE_2D,mapTexture)
         GL.glTexParameteri(GL.GL_TEXTURE_2D,GL.GL_TEXTURE_MIN_FILTER,GL.GL_LINEAR)
@@ -156,7 +163,7 @@ class TravelGlRenderer(private val context: Context, val scene: SceneGeometry,
         if(distance<.1) {
             updateMap(center,distance,detailWidth,detailHeight,calm)
             localBase?.let { draw(it,GL.GL_TRIANGLES,1f,2) }
-            val nearby=scene.packs.indices.sortedBy { i ->
+            val nearby=(if(mapWindow==null) emptyList() else scene.packs.indices.toList()).sortedBy { i ->
                 val p=scene.packs[i]
                 com.traveler.core.common.geo.GeodesicUtils.distanceMeters(center,
                     GeoPoint(center.latitude.coerceIn(p.south,p.north),center.longitude.coerceIn(p.west,p.east)))
@@ -170,6 +177,7 @@ class TravelGlRenderer(private val context: Context, val scene: SceneGeometry,
             streets.request(StreetTilePlan(emptyList(),0))
             mapFrameReady=true
         }
+        mapAvailable=distance>=.1 || mapWindow!=null
         GL.glUniform1f(routeScaleUniform,max(8.0/EarthGeometry.R,distance*2*tan(Math.toRadians(21.0))*2.2/max(1,height)).toFloat())
         // Do not show future / return paths over the current journey during playback.
         routes.forEachIndexed { i,mesh ->
@@ -293,40 +301,32 @@ class TravelGlRenderer(private val context: Context, val scene: SceneGeometry,
         val wanted=mapDrape.window(center.latitude,center.longitude,coverageDistance,width.toDouble()/max(1,height))
         val p=WebMercator.project(center)
         GL.glActiveTexture(GL.GL_TEXTURE1);GL.glBindTexture(GL.GL_TEXTURE_2D,mapTexture)
-        val moved=mapWindow?.containsCenter(p.x,p.y,wanted.span)!=true
-        if(moved) {
-            referenceRaster?.recycle();referenceRaster=mapDrape.rasterize(wanted)
-            mapWindow=wanted
-            // A finely tessellated base stays visible even with no downloaded DEM.
-            // The coarse globe's triangles can sit kilometres below the local surface.
-            val values=ArrayList<Float>()
-            fun add(r:Int,c:Int) {
-                val x=wanted.x+wanted.span*c/64;val y=(wanted.y+wanted.span*r/64).coerceIn(0.0,1.0)
-                val geo=WebMercator.unproject(WorldPoint(x-floor(x),y))
-                vertex(values,EarthGeometry.position(geo,-2.0),floatArrayOf(1f,1f,1f,1f),
-                    (x-floor(x)).toFloat(),y.toFloat())
-            }
-            for(r in 0 until 64) for(c in 0 until 64) {
-                add(r,c);add(r+1,c);add(r,c+1);add(r,c+1);add(r+1,c);add(r+1,c+1)
-            }
-            localBase=mesh(values)
-        }
-        val w=mapWindow!!
-        val footprint=visibleFootprint(w,1+scene.surface(center)/EarthGeometry.R)
+        val requestWindow=requestedWindow?.takeIf { it.containsCenter(p.x,p.y,wanted.span) }
+            ?: wanted.also { requestedWindow=it }
+        val footprint=visibleFootprint(requestWindow,1+scene.surface(center)/EarthGeometry.R)
         val plan=StreetTilePlan.visible(footprint,width,height)
         streets.request(plan)
-        val now=android.os.SystemClock.uptimeMillis()
-        if(moved || ((mapRevision!=streets.version || paintedTiles!=plan.tiles) && now-lastMapUpload>=600)) {
-            // A tile arriving during the upload must trigger another frame.
-            // Recording the later revision could acknowledge a tile we never painted.
-            val paintedRevision=streets.version
-            val bitmap=referenceRaster!!.copy(android.graphics.Bitmap.Config.ARGB_8888,true)
-            streets.paint(android.graphics.Canvas(bitmap),w,bitmap.width,plan)
-            try { GLUtils.texImage2D(GL.GL_TEXTURE_2D,0,bitmap,0) } finally { bitmap.recycle() }
-            mapRevision=paintedRevision;paintedTiles=plan.tiles;lastMapUpload=now
+        val request=AtlasRequest(requestWindow,plan.tiles.toSet(),streets.version)
+        val changed=mapWindow!=requestWindow || mapRevision!=request.revision || paintedTiles!=request.tiles
+        val atlas=if(asyncMaps) {
+            atlasWorker!!.request(request)
+            // Completion requests a frame even while paused. Playback never waits.
+            atlasWorker!!.take(requestWindow)
+        } else if(changed) atlasPainter.prepare(request) else null
+        if(atlas!=null) {
+            try {
+                if(!textureAllocated) {
+                    GLUtils.texImage2D(GL.GL_TEXTURE_2D,0,atlas.bitmap,0)
+                    textureAllocated=true
+                } else GLUtils.texSubImage2D(GL.GL_TEXTURE_2D,0,0,0,atlas.bitmap)
+                mapWindow=atlas.request.window
+                localBase=Mesh(atlas.base,atlas.base.capacity()/9)
+                mapRevision=atlas.request.revision;paintedTiles=atlas.request.tiles
+            } finally { atlasPainter.recycle(atlas.bitmap) }
         }
-        mapFrameReady=mapRevision==streets.version && paintedTiles==plan.tiles
-        GL.glUniform4f(mapBoundsUniform,w.x.toFloat(),w.y.toFloat(),(1/w.span).toFloat(),0f)
+        mapFrameReady=mapWindow==requestWindow && mapRevision==streets.version && paintedTiles==request.tiles
+        val w=mapWindow
+        if(w!=null) GL.glUniform4f(mapBoundsUniform,w.x.toFloat(),w.y.toFloat(),(1/w.span).toFloat(),0f)
         GL.glUniform1i(mapTextureUniform,1)
         GL.glActiveTexture(GL.GL_TEXTURE0)
     }
@@ -389,5 +389,12 @@ class TravelGlRenderer(private val context: Context, val scene: SceneGeometry,
         val status=IntArray(1);GL.glGetShaderiv(id,GL.GL_COMPILE_STATUS,status,0)
         check(status[0]!=0) { GL.glGetShaderInfoLog(id) };return id
     }
-    fun release() { streets.close();referenceRaster?.recycle();referenceRaster=null;terrain.clear();routes=emptyList();world=null;localBase=null;mapWindow=null;if(program!=0) GL.glDeleteProgram(program);GL.glDeleteTextures(2,intArrayOf(texture,mapTexture),0);program=0;texture=0;mapTexture=0 }
+    fun release() {
+        if(atlasWorker!=null) { atlasWorker?.close();atlasWorker=null }
+        else if(::atlasPainter.isInitialized) atlasPainter.close()
+        streets.close();terrain.clear();routes=emptyList();world=null;localBase=null;mapWindow=null;requestedWindow=null
+        if(program!=0) GL.glDeleteProgram(program)
+        GL.glDeleteTextures(2,intArrayOf(texture,mapTexture),0)
+        program=0;texture=0;mapTexture=0;textureAllocated=false;mapAvailable=false
+    }
 }

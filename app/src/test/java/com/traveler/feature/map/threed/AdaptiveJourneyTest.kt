@@ -35,15 +35,7 @@ class AdaptiveJourneyTest {
         assertTrue(positions.all { it.length()>1 })
         assertTrue(positions.zipWithNext().all { (a,b) -> (a-b).length()*EarthGeometry.R<150 })
     }
-    @Test fun bufferingIsBoundedAndPausesClockInsteadOfSkippingTime() {
-        val gate=MapBufferGate()
-        assertTrue(gate.update(0,true,true))
-        assertTrue(gate.update(7999,true,true))
-        assertFalse(gate.update(8000,true,true))
-        assertFalse(gate.update(9000,true,true))
-        assertTrue(gate.update(28_000,true,true))
-        assertFalse(gate.update(28_100,true,false))
-        assertFalse(gate.update(28_200,false,true))
+    @Test fun userPausePreservesPlaybackTime() {
         var nanos=0L
         val clock=PlaybackTimeTracker(60f,MonotonicClock { nanos })
         clock.start();nanos=1_000_000_000;clock.update();clock.pause()

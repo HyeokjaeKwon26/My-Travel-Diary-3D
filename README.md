@@ -2,7 +2,7 @@
 
 An independent Android 3D edition of [My Travel Diary](https://github.com/HyeokjaeKwon26/My-Travel-Diary), based on original commit `9bcfb4f`.
 
-**Version: 1.0.0-rc5.** Automatic north-up route framing, adaptive phone/tablet layouts, calendar dates, local visual photo selection, and portrait/landscape video creation and playback. Physical-device acceptance is pending; Galaxy S23 Ultra is the primary target. See [validation and remaining work](docs/PRODUCTION_STATUS.md).
+**Version: 1.0.0-rc6.** Non-blocking background map preparation, bounded 2D drawing, automatic north-up route framing, adaptive phone/tablet layouts, calendar dates, local visual photo selection, and portrait/landscape video creation and playback. Physical-device acceptance is pending; Galaxy S23 Ultra is the primary target. See [validation and remaining work](docs/PRODUCTION_STATUS.md).
 
 ## 한국어
 
@@ -22,7 +22,7 @@ Google Timeline JSON과 휴대폰 사진을 여행 다이어리로 구성하고,
 - 사진 썸네일의 유사도·선명도·노출·장면 종류를 휴대폰에서 분석하고 결과를 캐시합니다. 사진의 개인적 중요도를 보장하지는 않으며 직접 고른 사진을 우선합니다.
 - 세로 9:16/가로 16:9, 1080p/720p 영상을 생성하고 앱 내 플레이어에서 회전·전체화면으로 볼 수 있습니다. 원래 영상 비율을 유지합니다.
 - 현재 화면의 OpenStreetMap 도로·지명을 3D 지형에 표시합니다. 처음 보는 지역은 인터넷이 필요하며 Wi-Fi/모바일 데이터 사용을 지도 옵션에서 끌 수 있습니다.
-- 지도 준비 중에는 사진·이동·음악을 함께 대기시킵니다. 실패 시 무한 대기하지 않고 기본 지도와 함께 재개합니다. 상세 지도 캐시는 최대 96 MiB입니다. 지형 캐시와 별도이며, 경로 전체를 미리 다운로드하거나 오프라인 지도 팩을 만들지 않습니다. 영상 생성 전에 이미 불러온 지도를 별도로 고정해 사용하며 없는 부분은 기본 지도로 표시합니다. 임시 복사본은 최대 96 MiB이며 완료·취소 후 삭제합니다.
+- 지도 로딩 중에도 사진·이동·음악은 계속 재생합니다. 새 지도는 별도 스레드에서 준비하고 기존 화면을 유지하다 교체합니다. 2D 지도는 재생 영역 밖으로 그려지지 않습니다. 상세 지도 캐시는 최대 96 MiB입니다. 지형 캐시와 별도이며, 경로 전체를 미리 다운로드하거나 오프라인 지도 팩을 만들지 않습니다. 영상 생성 전에 이미 불러온 지도를 별도로 고정해 사용하며 없는 부분은 기본 지도로 표시합니다. 임시 복사본은 최대 96 MiB이며 완료·취소 후 삭제합니다.
 
 - 자동차·버스·기차·지하철·비행기·배·자전거·걷기·달리기를 크게 과장한 입체 장난감으로 표시합니다.
 - 오르막/내리막의 기울기, 통통 튀는 차체, 회전하는 바퀴, 걷기/달리기/페달 동작과 비행기·배의 흔들림을 추가했습니다.

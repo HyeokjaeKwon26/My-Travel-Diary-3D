@@ -89,7 +89,7 @@ class StreetMapAndroidTest {
                 awaitCondition { session.detailCount==batch.size }
                 // Ensure the next equal-size batch is not mistaken for this batch.
                 session.request(StreetTilePlan(emptyList(),15))
-                assertEquals(0,session.detailCount)
+                awaitCondition { session.detailCount==0 }
             }
             session.setActive(true)
             session.request(StreetTilePlan(listOf(tiles.first()),15))
