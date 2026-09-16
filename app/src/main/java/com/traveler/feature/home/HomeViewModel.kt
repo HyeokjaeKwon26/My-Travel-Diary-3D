@@ -10,6 +10,8 @@ import com.traveler.domain.repository.TripRepository
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
 
 class HomeViewModel(application: Application) : AndroidViewModel(application) {
@@ -18,8 +20,19 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         TravelerDatabase.getDatabase(application)
     )
 
-    val trips: StateFlow<List<Trip>> = repository.getAllTrips()
+    private val preferences = application.getSharedPreferences("home_sort", 0)
+    val sort = MutableStateFlow(TripSort.entries.firstOrNull { it.name == preferences.getString("sort", null) } ?: TripSort.CREATED)
+    val ascending = MutableStateFlow(preferences.getBoolean("ascending", false))
+    val trips: StateFlow<List<Trip>> = combine(repository.getAllTrips(), sort, ascending) { trips, sort, ascending ->
+        sort.sorted(trips, ascending)
+    }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    fun setSort(value: TripSort, increasing: Boolean = ascending.value) {
+        sort.value = value
+        ascending.value = increasing
+        preferences.edit().putString("sort", value.name).putBoolean("ascending", increasing).apply()
+    }
 
     init {
         viewModelScope.launch {

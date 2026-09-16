@@ -1,3 +1,36 @@
+# 1.0.0-rc10 diary and video presentation
+
+Date: 2026-09-16. Photo details now reserve the union of host-window and dialog safe insets, with a pinned representative-photo action and independently scrollable metadata. The last recorded Home card replaces its media thumbnail with a bounded 960×540 offline whole-route overview; original photos remain available through a gallery button. The overview fits actual journey bounds, including short trips, without the live map’s regional minimum scale. No map-provider or live-camera changes were made.
+
+Movement-photo moments add their own 1.8–2.5 second holds rather than shortening the route's travel time. The deterministic timeline fixes the route position, heading, camera, accumulated distance and toy animation while the photo is displayed; both live playback and MP4 rendering use the same state. Holds use canonical route positions, never photo coordinates. Seeking remains random-access and resumes continuously. Photo captions (including Stop) are removed in both renderers.
+
+Trains now have a KTX-inspired tapered nose, white body, blue stripe, connected passenger coach, small bogies and roof pantograph. Blue roof/nose accents and a bounded train pitch keep it recognizable on downhill grades. Video title/end cards use resolution-independent Canvas motion graphics: colored confetti, rotating rays, gradients, gold borders, a prominent title and separate statistics. Numbered custom titles are distinguished from private place/address labels. Video-player controls also respect system bars and display cutouts.
+
+Home supports persisted name / creation time / travel start date sorting in both directions. Existing database records and archives require no migration; original photos and the original 2D repository are unchanged.
+
+## RC10 verification
+
+- 333 JVM tests passed with zero failures/errors/skips. Added coverage includes two movement-photo holds, stable 3D position and animation, monotonic distance, random seeks, continuous resumption, all six sort orders, tie ordering and numbered-title/address privacy.
+- Debug APK, instrumentation APK and lint builds passed. Lint: 0 errors, 89 warnings and 8 informational findings; three new warnings are optional Android KTX convenience-function suggestions.
+- Ten distinct targeted Android cases passed across the verification runs. The representative-photo action remains clickable above three-button navigation at 150% font scale in portrait, with an additional successful 2400×1080 landscape run. Metadata scrolls independently. [Portrait](verification-3d/rc10-photo-dialog.png), [landscape](verification-3d/rc10-photo-dialog-landscape.png).
+- Actual GLES tests verify every transport mode over multiple journey positions and both normal/continental/dateline flight fixtures. The initial KTX livery was too faint and its downhill pose too end-on; stronger blue accents and bounded train pitch now pass the original color/size/clipping assertions. [Final north-up train](verification-3d/rc10-train-north-up.png).
+- The route preview waits for actual displayed pixels rather than treating the Compose image node as a committed frame. Short routes fill the postcard rather than inheriting the regional overview minimum scale. [Final route postcard](verification-3d/rc10-route-overview.png).
+- Four overlay regression tests cover uncropped portrait/panoramic photos in both export aspects, date-picker safe navigation, large-font persistent date/header layout, and rewind-to-start behavior.
+- Real exports passed: 1080×1920 portrait without music (7,226,304 bytes) and 1280×720 landscape with music (4,987,970 bytes). Both decode fully with FFmpeg without errors. The landscape export test also confirms in-app rotation preserves the player instance, pause state, seek position and aspect ratio. [Encoded portrait cover](verification-3d/rc10-encoded-cover.png), [encoded landscape cover](verification-3d/rc10-encoded-landscape-cover.png). Covers were also rendered at all four 720p/1080p portrait/landscape sizes, including a long Korean/English title.
+- Existing 31.2 km / 2-visit / 0-photo and 835.5 km / 5-visit / 4-photo fixtures survived update installation and process restart. Name/ascending selection persists; phone and 2560×1600 tablet layouts were inspected. [Sorted phone](verification-3d/rc10-sort-name.png), [tablet](verification-3d/rc10-home-tablet.png).
+- The API 36 emulator cold boot encountered system-service restarts and a System UI ANR. A stale instrumentation class referenced an earlier Trip schema; recompiling the test APK resolved the NoSuchMethodError, and the export rerun passed. These failed attempts are not counted as passed tests. Physical S23 Ultra remains unavailable. Remote CI is not counted as passed pending completion.
+
+- Final production-signed universal APK was installed over the existing app without removal, then force-stopped and restarted. Both saved journeys and name/ascending sorting survived. Version code 11 / RC10 is installed. [Signed home](verification-3d/rc10-signed-home.png). GitHub run `35151439348` remained in progress at local acceptance and is not counted as passed.
+
+## RC10 packages
+
+Application source: `135f8f0`. Both packages use `com.traveler.threed`, version code 11 / `1.0.0-rc10` and the existing production signing certificate. Optimized release and final lint builds pass. Signature, package ID/version, ABI sets, APK ZIP alignment, 64-bit ELF 16 KiB alignment and native/map/timezone resource contracts pass.
+
+- `My-Travel-Diary-3D-1.0.0-rc10.apk`: 89431167 bytes; SHA-256 `1ae60850916ebc4f232646a22585847166f5037c019d8921f3cd7e168906bbc7`.
+- `My-Travel-Diary-3D-1.0.0-rc10-arm64.apk`: 55917957 bytes; SHA-256 `0d32dd87fead358562b994ce859d6d010b27221aa75131c839676da886ccb777`.
+
+---
+
 # 1.0.0-rc9 offline nearby-region summaries
 
 Date: 2026-09-16. Existing saved visit coordinates now supplement missing/generic Home/Work names using the bundled city/landmark catalog. Every derived label ends in `인근` (near). The resolver chooses the nearest catalog city within 60 km or landmark within 40 km; it does not establish city-boundary membership or an attraction visit. Areas beyond catalog coverage remain unresolved. No network lookup, new map pack, schema migration or mutation of recorded names is involved.

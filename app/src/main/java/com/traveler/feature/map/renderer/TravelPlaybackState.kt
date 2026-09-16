@@ -27,5 +27,6 @@ data class TravelPlaybackState(
     val currentAltitudeMeters: Double? = null,
     val currentSpeedKmh: Double = 0.0,
     val currentTraveledDistanceMeters: Double = 0.0,
-    val totalTripDistanceMeters: Double = 0.0
+    val totalTripDistanceMeters: Double = 0.0,
+    val animationTimeSeconds: Double? = null
 )

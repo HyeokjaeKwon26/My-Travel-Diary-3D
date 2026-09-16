@@ -29,8 +29,13 @@ class VideoPlayerActivity : ComponentActivity() {
         if (file == null || !file.isFile || file.canonicalFile.parentFile != exports) { finish(); return }
         resumePosition = savedInstanceState?.getInt("position") ?: 0
         resumePlaying = savedInstanceState?.getBoolean("playing") ?: true
-        WindowCompat.setDecorFitsSystemWindows(window, true)
+        WindowCompat.setDecorFitsSystemWindows(window, false)
         val root = FrameLayout(this).apply { setBackgroundColor(Color.BLACK) }
+        androidx.core.view.ViewCompat.setOnApplyWindowInsetsListener(root) { view, insets ->
+            val safe = insets.getInsets(WindowInsetsCompat.Type.systemBars() or WindowInsetsCompat.Type.displayCutout())
+            view.setPadding(safe.left, safe.top, safe.right, safe.bottom)
+            insets
+        }
         video = VideoView(this)
         root.addView(video, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,
             ViewGroup.LayoutParams.MATCH_PARENT, Gravity.CENTER))
