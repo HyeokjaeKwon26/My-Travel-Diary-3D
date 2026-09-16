@@ -11,6 +11,7 @@ import com.traveler.domain.repository.TripRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
@@ -29,8 +30,9 @@ class TripRepositoryImpl(
     }
 
     override fun getAllTrips(): Flow<List<Trip>> {
-        return database.tripDao().getAllTripsFlow().map { entities ->
-            entities.map { entity ->
+        return database.tripDao().getTripCardRowsFlow().map { rows ->
+            rows.groupBy { it.trip.id }.values.map { tripRows ->
+                val entity = tripRows.first().trip
                 Trip(
                     id = entity.id,
                     title = entity.title,
@@ -41,10 +43,13 @@ class TripRepositoryImpl(
                     countries = parseJsonStringList(entity.countriesJson),
                     days = emptyList(), // Days loaded on detail screen
                     totalMediaCount = entity.totalMediaCount,
-                    createdAtEpochMs = entity.createdAtEpochMs
+                    createdAtEpochMs = entity.createdAtEpochMs,
+                    visitSummary = TripVisitSummary.from(tripRows.mapNotNull { row ->
+                        row.summaryVisitId?.let { TripVisitLabel(it, row.summaryPlaceName) }
+                    })
                 )
             }
-        }
+        }.flowOn(Dispatchers.Default)
     }
 
     override suspend fun getTripById(tripId: String): Trip? = withContext(Dispatchers.IO) {
@@ -157,7 +162,10 @@ class TripRepositoryImpl(
             days = days,
             uncertainDateMedia = uncertainDateMediaList,
             totalMediaCount = tripEntity.totalMediaCount,
-            createdAtEpochMs = tripEntity.createdAtEpochMs
+            createdAtEpochMs = tripEntity.createdAtEpochMs,
+            visitSummary = TripVisitSummary.from(visits.sortedWith(
+                compareBy<Visit> { it.startTimestampEpochMs }.thenBy { it.id }
+            ).map { TripVisitLabel(it.id, it.placeName) })
         )
     }
 

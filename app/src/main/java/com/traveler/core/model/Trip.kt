@@ -18,7 +18,9 @@ data class Trip(
     val totalMediaCount: Int = 0,
     val mediaDiagnostics: MediaPipelineDiagnostics? = null,
     val movementDiagnostics: CanonicalTimelineDiagnostics? = null,
-    val createdAtEpochMs: Long = System.currentTimeMillis()
+    val createdAtEpochMs: Long = System.currentTimeMillis(),
+    // Derived from saved visits, never from the legacy five-name cache or an archived summary.
+    @kotlinx.serialization.Transient val visitSummary: TripVisitSummary = TripVisitSummary()
 )
 
 @Serializable

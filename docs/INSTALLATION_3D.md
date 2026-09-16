@@ -2,16 +2,20 @@
 
 ## New installation
 
-- Download **My-Travel-Diary-3D-1.0.0-rc7-arm64.apk** for Galaxy S23 Ultra and other ARM64 devices. **My-Travel-Diary-3D-1.0.0-rc7.apk** is the universal alternative for supported 32-bit ARM and x86 devices. Both use the same production signing key and release optimization; install only one.
+- Download **My-Travel-Diary-3D-1.0.0-rc8-arm64.apk** for Galaxy S23 Ultra and other ARM64 devices. **My-Travel-Diary-3D-1.0.0-rc8.apk** is the universal alternative for supported 32-bit ARM and x86 devices. Both use the same production signing key and release optimization; install only one.
 - Open the downloaded APK on your phone and allow installation from that source if Android asks.
 - Open My Travel Diary 3D and import your Timeline and photos. On Wi-Fi, the app prepares terrain around your journeys; pin a journey to keep its terrain for offline use.
 - The original 2D app (`com.traveler`) is separate and can stay installed. The 3D edition uses `com.traveler.threed`.
 
 ## Updating an earlier 3D release
 
-Install either compatible RC7 APK directly over an earlier production 3D version. The application ID and signing key are unchanged and the version code increases to 8. Keep the installed app: uninstalling is unnecessary and would remove its local data. Existing journeys and terrain remain available.
+Install either compatible RC8 APK directly over an earlier production 3D version. The application ID and signing key are unchanged and the version code increases to 9. Keep the installed app: uninstalling is unnecessary and would remove its local data. Existing journeys and terrain remain available.
 
 The earlier 3D alpha had no installations or users; no alpha migration procedure is needed.
+
+## Home card visits
+
+`방문 기록 N회` counts saved stop records, including unnamed stops and separate returns to the same place. A multi-day stay with the same source ID counts once. It is not a unique city/place count or a count of route coordinates. The summary is derived on read from existing visits and name overrides; no re-import or database migration is required. `대표 장소` shows up to three distinct recorded names plus the remaining named entries, not a complete ordered route. Unknown names are identified separately; Home/Work-only labels alongside unnamed stops show `장소 이름 정보 부족`. The legacy five-name archive/title cache no longer supplies card counts or labels. Map, playback and recorded travel data are unchanged.
 
 ## Map detail and camera
 

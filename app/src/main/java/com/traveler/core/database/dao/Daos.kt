@@ -6,6 +6,16 @@ import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface TripDao {
+    @Query("""
+        SELECT t.*, v.sourceId AS summaryVisitId,
+               COALESCE(o.overrideValue, v.placeName) AS summaryPlaceName
+        FROM trips t
+        LEFT JOIN visits v ON v.tripId = t.id
+        LEFT JOIN user_overrides o ON o.targetType = 'VISIT_NAME' AND o.targetSourceId = v.sourceId
+        ORDER BY t.createdAtEpochMs DESC, t.id, v.startTimestampEpochMs, v.sourceId
+    """)
+    fun getTripCardRowsFlow(): Flow<List<TripCardRow>>
+
     @Query("SELECT * FROM trips ORDER BY createdAtEpochMs DESC")
     fun getAllTripsFlow(): Flow<List<TripEntity>>
 

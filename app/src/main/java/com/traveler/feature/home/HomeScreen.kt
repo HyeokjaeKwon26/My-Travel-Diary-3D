@@ -17,6 +17,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -130,8 +131,9 @@ fun HomeScreen(
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun TripCard(
+internal fun TripCard(
     trip: Trip,
     onClick: () -> Unit,
     onDelete: () -> Unit
@@ -139,6 +141,7 @@ private fun TripCard(
     Card(
         modifier = Modifier
             .fillMaxWidth()
+            .testTag("trip-card-${trip.id}")
             .clickable(onClick = onClick),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
@@ -155,6 +158,7 @@ private fun TripCard(
             ) {
                 Text(
                     text = trip.title,
+                    modifier = Modifier.weight(1f),
                     fontWeight = FontWeight.Bold,
                     fontSize = 18.sp,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -178,25 +182,35 @@ private fun TripCard(
 
             Spacer(modifier = Modifier.height(12.dp))
 
-            Row(
+            FlowRow(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(16.dp)
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 val distanceKm = String.format(java.util.Locale.US, "%.1f", trip.totalDistanceMeters / 1000.0)
                 BadgeInfo(icon = "📍", label = "$distanceKm km")
                 BadgeInfo(icon = "📷", label = "${trip.totalMediaCount} photos")
-                if (trip.cities.isNotEmpty()) {
-                    BadgeInfo(icon = "🏙️", label = "${trip.cities.size} places")
-                }
+                BadgeInfo(icon = "📌", label = "방문 기록 ${trip.visitSummary.visitCount}회")
             }
 
-            if (trip.cities.isNotEmpty()) {
+            val summary = trip.visitSummary
+            if (summary.visitCount > 0) {
                 Spacer(modifier = Modifier.height(8.dp))
                 Text(
-                    text = "Visited: ${trip.cities.take(3).joinToString(" → ")}${if (trip.cities.size > 3) "..." else ""}",
+                    text = if (summary.representativeNames.isEmpty()) "장소 이름 정보 부족" else buildString {
+                        append("대표 장소: ")
+                        append(summary.representativeNames.joinToString(" · "))
+                        if (summary.otherNamedPlaceCount > 0) append(" 외 ${summary.otherNamedPlaceCount}곳")
+                    },
+                    maxLines = 2,
+                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
                     fontSize = 12.sp,
                     color = MaterialTheme.colorScheme.primary
                 )
+                if (summary.unnamedVisitCount > 0 && summary.representativeNames.isNotEmpty()) {
+                    Text("이름 없는 방문 기록 ${summary.unnamedVisitCount}회",
+                        fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
             }
         }
     }
