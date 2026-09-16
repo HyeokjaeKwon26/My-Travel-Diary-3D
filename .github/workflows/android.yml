@@ -21,10 +21,13 @@ jobs:
       - name: Install Android SDK platform
         run: |
           "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" 'platforms;android-36' 'build-tools;35.0.0' >/dev/null
-      - name: Unit tests, debug/release APK and lint
+      - name: Unit tests, debug APK and lint
         run: |
           chmod +x gradlew
-          ./gradlew testDebugUnitTest assembleDebug assembleRelease lintDebug --max-workers=2 '-Dorg.gradle.jvmargs=-Xmx3g -Dfile.encoding=UTF-8' --console=plain
+          ./gradlew testDebugUnitTest assembleDebug lintDebug --max-workers=1 '-Dorg.gradle.jvmargs=-Xmx3g -Dfile.encoding=UTF-8' -Pkotlin.compiler.execution.strategy=in-process --console=plain
+      - name: Optimized release APK and packaged contracts
+        run: |
+          ./gradlew assembleRelease --max-workers=1 '-Dorg.gradle.jvmargs=-Xmx3g -Dfile.encoding=UTF-8' -Pkotlin.compiler.execution.strategy=in-process --console=plain
           python3 tools/verify_release_jni.py
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         if: always()
