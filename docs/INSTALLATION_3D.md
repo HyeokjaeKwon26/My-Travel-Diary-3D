@@ -1,53 +1,123 @@
-# Installation and signing
+# My Travel Diary 3D 설치·사용 안내
 
-## New installation
+[← 앱 소개로 돌아가기](../README.md)
 
-- Download **My-Travel-Diary-3D-1.0.0-rc11-arm64.apk** for Galaxy S23 Ultra and other ARM64 devices. **My-Travel-Diary-3D-1.0.0-rc11.apk** is the universal alternative for supported 32-bit ARM and x86 devices. Both use the same production signing key and release optimization; install only one.
-- Open the downloaded APK on your phone and allow installation from that source if Android asks.
-- Open My Travel Diary 3D and import your Timeline and photos. On Wi-Fi, the app prepares terrain around your journeys; pin a journey to keep its terrain for offline use.
-- The original 2D app (`com.traveler`) is separate and can stay installed. The 3D edition uses `com.traveler.threed`.
+여행 기록을 가져와 지도 위에서 재생하고 영상으로 저장하는 방법을 안내합니다. 앱에 표시되는 버튼 이름을 함께 적었으니 순서대로 따라 해 보세요.
 
-## Updating an earlier 3D release
+## 1. 앱 설치하기
 
-Install either compatible RC11 APK directly over an earlier production 3D version. The application ID and signing key are unchanged and the version code increases to 12. Keep the installed app: uninstalling is unnecessary and would remove its local data. Existing journeys and terrain remain available.
+Android 8.0 이상인 휴대폰이나 태블릿에서 사용할 수 있습니다. 현재 버전은 **1.0.0-rc11 (시험 배포)**입니다.
 
-The earlier 3D alpha had no installations or users; no alpha migration procedure is needed.
+| 기기 | 설치 파일 |
+| --- | --- |
+| 갤럭시 S23 Ultra 등 대부분의 최근 Android 휴대폰·태블릿 | [추천 APK 받기 — 약 56 MB](https://github.com/HyeokjaeKwon26/My-Travel-Diary-3D/releases/download/v1.0.0-rc11/My-Travel-Diary-3D-1.0.0-rc11-arm64.apk) |
+| 위 파일이 기기와 호환되지 않을 때 | [범용 APK 받기 — 약 89 MB](https://github.com/HyeokjaeKwon26/My-Travel-Diary-3D/releases/download/v1.0.0-rc11/My-Travel-Diary-3D-1.0.0-rc11.apk) |
 
-## Home card visits
+APK는 Android 앱 설치 파일입니다. **둘 중 하나만** 받으면 됩니다.
 
-`방문 기록 N회` counts saved stop records, including unnamed stops and separate returns to the same place. A multi-day stay with the same source ID counts once. It is not a unique city/place count or a count of route coordinates. The summary is derived on read from existing visits and name overrides; no re-import or database migration is required. `대표 장소` shows up to three distinct recorded names plus the remaining named entries, not a complete ordered route. Unnamed or generic Home/Work visits can use the nearest bundled city (within 60 km) or landmark (within 40 km), always suffixed with `인근` (near). This is proximity, not administrative-boundary or venue identification. No lookup network request or extra data download is made. User overrides and recorded names take priority; duration, matched-photo counts and distinct visit-start dates rank the remaining previews. Generic home/work regions are deprioritized. Unresolved visits are counted separately; only an entirely unresolvable preview shows `장소 이름 정보 부족`. The legacy five-name archive/title cache no longer supplies card counts or labels. Map, playback and recorded travel data are unchanged.
+1. 휴대폰에서 위 링크를 눌러 설치 파일을 내려받습니다.
+2. 다운로드한 파일을 엽니다. Android가 해당 브라우저나 파일 앱의 설치 허용을 요청하면 안내에 따라 허용합니다.
+3. 설치가 끝나면 **My Travel Diary 3D**를 엽니다.
 
-## Map detail and camera
+기존 3D 버전을 쓰고 있다면 **앱을 지우지 말고 새 설치 파일을 열어 업데이트**하세요. 삭제하면 앱 안의 여행 데이터도 삭제됩니다. 기존 2D 앱과는 별도 앱이며, 2D 앱의 여행이 자동으로 옮겨지지는 않습니다.
 
-Open **Map settings** using the gear beside the journey title. The large floating Terrain/Options card has been removed from the map; 2D/3D switching, terrain storage and street-detail settings remain available there.
+## 2. 준비 없이 예시 여행 체험하기
 
-Playback uses a compact distance card and a persistent calendar date plus `Day N`. Day numbers are calendar dates relative to the saved trip start date, not elapsed 24-hour periods. Visits use their recorded timezone; movement keeps departure time until arrival, then uses destination time. Missing/invalid timezone metadata is explicitly marked `UTC`, never silently replaced with the phone timezone. Photos retain their full upright aspect ratio in the app and exported video.
+**+ New Travel Story → Try Grand Canyon 3D • illustrative route**를 누르세요. 개인 타임라인 파일 없이 3D 지형과 움직이는 자동차를 볼 수 있습니다.
 
-The camera always keeps north at the top while following the current location. Vehicles still face their travel direction. The route length and available screen aspect determine the scale automatically; manual scale and pinch zoom are not used. The same camera calculation frames exported videos. Intro/outro show the whole route, and long movements use a broader view.
+예시 경로는 기능을 보여 주기 위한 경로입니다. 실제 여행자의 GPS 기록이나 도로 안내 경로는 아닙니다.
 
-Internet street detail is on by default and uses Wi-Fi or mobile data for the visible area only. Disable it in the same dialog to use cached detail and the bundled regional fallback. The street cache is capped at 96 MiB, separate from the elevation cache; it is not an offline map pack. Video export uses already cached street detail without fetching new tiles. GPS records and road matching are unchanged. Street-map loading no longer pauses story time, photos or music. Raster and map-base preparation run off the live render thread; export still waits for its own deterministic cached map frame. The 2D renderer clips all drawing to its viewport.
+## 3. 내 여행 만들기
 
-## Galaxy S23 Ultra
+준비물은 **Google 지도 타임라인에서 내보낸 JSON 파일**과 **해당 기간에 찍은 휴대폰 사진**입니다. 이 앱은 이미 기록된 여행을 불러옵니다. 사진만으로 새로운 이동 경로를 만들어 주지는 않습니다.
 
-Start with 1080p export; 720p is available for shorter encoding time/lower memory use. Internal map resolution adapts to render cost and Android thermal signals independently from the chosen video resolution. These are controls, not a measured S23 Ultra performance guarantee. Physical phone testing was unavailable during this build.
+1. 첫 화면에서 **+ New Travel Story**를 누릅니다.
+2. 사진 접근 요청이 나오면 여행에 사용할 사진에 대한 접근을 허용합니다. 일부 사진만 허용하면 그 사진들만 사용할 수 있습니다.
+3. **Choose Timeline JSON File**을 눌러 준비한 타임라인 파일을 선택합니다.
+4. **Trip Title (Optional)**에 여행 이름을 적습니다. 예: `가을 뉴잉글랜드 드라이브`.
+5. **Select dates**를 눌러 달력에서 여행 시작일과 마지막 날을 선택하고 **Use dates**를 누릅니다.
+6. **Reconstruct Travel Story**를 누릅니다. 진행률과 예상 남은 시간이 표시되며, 자료의 양과 기기 성능에 따라 준비 시간이 달라집니다.
 
-## Maintainer signing
+<img src="verification-3d/rc7-signed-date-picker.png" width="280" alt="달력에서 여행 시작일과 마지막 날을 선택하고 아래 Use dates 버튼으로 확정하는 화면" />
 
-`assembleRelease` uses ignored `keystore.properties` when available. Without it, CI produces an unsigned release. Keep the same key for future production updates; losing it prevents compatible updates. Never commit the key, credentials, or debug signing identity.
+*날짜 선택 화면 예시. 달력의 언어와 날짜 형식은 기기 설정에 따라 다를 수 있습니다.*
 
-Example configuration (replace placeholders locally):
+## 4. 여행 재생하기
 
-```properties
-storeFile=C:/private/traveler3d-release.jks
-storePassword=YOUR_PASSWORD
-keyAlias=traveler3d
-keyPassword=YOUR_PASSWORD
-```
+여행 카드를 열고 **지도 안의 ▶ 버튼**을 누릅니다.
 
-This workstation keeps the production key outside the checkout at `%USERPROFILE%/.android/traveler3d-release.jks` and local credentials in ignored `keystore.properties`. Back these up securely. Release version codes must increase for future updates.
+| 하고 싶은 일 | 조작 방법 |
+| --- | --- |
+| 잠시 멈추거나 이어 보기 | 재생·일시정지 버튼 |
+| 처음부터 다시 보기 | 둥근 화살표 버튼 |
+| 원하는 장면으로 이동 | 재생 막대를 원하는 위치로 이동 |
+| 재생 시간 확인 | 막대 위의 `현재 시간 / 전체 시간` 확인 |
+| 천천히 또는 빠르게 보기 | `1×` 속도 버튼 |
+| 음악 켜기·끄기 | 음표 버튼 |
+| 지도를 크게 보기 | 재생 막대의 전체화면 버튼; 가로로 돌려서도 감상 가능 |
+| 지도와 지형 설정 변경 | 여행 제목 옆 톱니바퀴 **Map settings** |
 
-## Video and screen size
+지도는 북쪽을 위로 고정하고 현재 위치를 따라갑니다. 경로가 잘 보이도록 배율을 자동으로 조절하므로 손가락으로 확대·축소할 필요가 없습니다. 재생 화면에 실제 날짜와 `Day N`으로 여행 며칠째인지 표시합니다.
 
-Choose Portrait (9:16) or Landscape (16:9) before exporting, then 720p or 1080p. Rotating the playback screen preserves the encoded aspect and uses letterboxing; it does not regenerate or crop the video. The in-app Full screen button changes orientation. Camera framing adapts to the chosen export aspect. Smaller/large-font diary layouts stack content to keep labels readable.
+이동 중 찍은 사진을 보여 줄 때는 경로와 캐릭터가 잠시 멈춘 뒤 다시 이동합니다. 사진은 원본 비율로 표시됩니다.
 
-The image-labeling model is bundled for local, offline photo analysis. This increases APK size; the ARM64 APK omits other CPU runtimes to reduce the download. It does not contain a global terrain or street-map pack. The bundled ML Kit SDK can send device/app/usage diagnostics; see [privacy](PRIVACY_3D.md).
+## 5. 사진과 여행 목록 다듬기
+
+**마음에 드는 사진을 대표 사진으로:** 여행 일지의 사진을 누르고 **Use as Representative Photo**를 선택합니다. 직접 고른 사진은 자동 선택보다 우선합니다.
+
+**자동 선택을 다시 하고 싶을 때:** 여행 상단의 **사진 다시 고르기**를 누르고 확인합니다. 직접 지정한 대표 사진은 유지합니다. 평소에는 저장된 선택 결과를 재사용하므로 여행을 열 때마다 사진 전체를 다시 분석하지 않습니다. 기존 여행은 업데이트 후 처음 열 때 한 번 준비가 필요할 수 있습니다.
+
+사진첩에 새로 추가한 사진이 기존 여행에 자동으로 가져와지는 것은 아닙니다. **사진 다시 고르기**는 그 여행에 이미 연결된 사진을 대상으로 합니다.
+
+**여행 정렬하기:** 첫 화면의 정렬 메뉴에서 이름순·만든순·여행날짜순을 선택하고, 옆의 오름차순·내림차순 버튼으로 순서를 바꿉니다.
+
+카드의 **방문 기록 N회**는 들른 기록의 수이며 같은 장소에 다시 방문한 경우도 포함합니다. **○○ 인근**은 기록된 좌표와 가까운 지역을 뜻하며, 정확히 그 관광지나 도시에 방문했다고 확정한 이름은 아닙니다.
+
+## 6. 영상으로 저장하고 공유하기
+
+1. 여행 **제목 오른쪽의 ▶ 버튼**을 눌러 **Export Travel Video**를 엽니다.
+2. 영상 길이를 고릅니다. **Short Story**는 짧은 요약, **Standard Story**는 대표 장면 중심, **Full Story**는 더 자세한 구성입니다. 각 항목에서 예상 영상 길이를 확인할 수 있습니다.
+3. **Portrait 9:16**(세로) 또는 **Landscape 16:9**(가로)를 선택합니다.
+4. **720p / 1080p**와 배경음악 사용 여부를 선택합니다. 처음에는 Standard Story와 720p로 시작해 보세요. 1080p를 지원하지 않는 기기에서는 720p로 조정될 수 있습니다.
+5. **Create Travel Video**를 누르고 완료될 때까지 기다립니다.
+6. **Play Preview**로 확인한 뒤 **Save Video**로 사진첩에 저장하거나 **Share**로 공유합니다.
+
+완성된 MP4는 별도의 영상 파일입니다. 앱 안에서도 전체화면·가로보기로 감상할 수 있으며, 화면을 돌려도 원래 영상 비율은 유지됩니다. 세로 영상을 가로 영상으로 바꾸려면 방향을 바꿔 다시 만들어 주세요.
+
+주소를 일반화하는 옵션은 장소 이름에 적용됩니다. 지도에 보이는 경로나 사진 속 주소까지 숨겨 주지는 않으므로, 공유 전 미리보기로 확인해 주세요.
+
+## 7. 여행 백업과 복원
+
+여행 제목 오른쪽 **▶ → Back up this journey**를 눌러 백업 파일을 저장합니다. 복원할 때는 첫 화면의 **Restore**에서 그 파일을 선택합니다.
+
+**백업에는 원본 사진이 들어 있지 않습니다.** 여행 기록과 사진 연결 정보를 저장하며, 사진 원본과 타임라인 파일은 따로 보관해 주세요. 다른 휴대폰으로 사진까지 옮겨 주는 기능은 아닙니다. 앱을 삭제하기 전에는 필요한 여행을 백업하고 완성된 영상도 사진첩에 저장하세요.
+
+## 궁금하거나 잘 안될 때
+
+### 사진을 삭제해도 여행에 남나요?
+
+앱은 사진 선택 결과를 저장하며, 원본 이미지의 보관용 복사본을 만들지 않습니다. 사진첩에서 원본을 지우면 여행에서 해당 사진을 표시할 수 없습니다. 이미 **Save Video**로 저장한 MP4는 원본 사진을 삭제해도 그대로 감상할 수 있습니다.
+
+### 사진이 나오지 않아요
+
+앱에 사진 접근 권한이 있는지, 원본 사진이 휴대폰에 남아 있는지, 여행 날짜가 맞는지 확인해 주세요. 일부 사진에만 접근을 허용했다면 필요한 사진도 허용해야 합니다. 자동 선택이 기대와 다르면 사진을 직접 대표 사진으로 지정할 수 있습니다.
+
+### 지도나 영상의 일부 지역이 단순하게 보여요
+
+처음 보는 지역의 상세 지도·지형에는 인터넷이 필요합니다. Wi-Fi에서 여행을 열어 확인하고, 제목 옆 톱니바퀴에서 지도 설정을 살펴보세요. 상세 도로 지도는 모바일 데이터도 사용할 수 있습니다.
+
+영상 만들기는 휴대폰에 이미 준비된 상세 지도를 사용합니다. 상세 지도가 없거나 정리된 지역에는 기본 지도가 나올 수 있습니다. 여행 전체의 상세 지도를 한 번에 내려받는 기능은 제공하지 않습니다.
+
+### 경로가 점선이거나 실제 도로와 달라요
+
+위치 기록이 없는 구간은 추정 연결을 점선으로 표시합니다. 이 앱은 여행을 회상하는 앱으로, 길 안내나 정확한 도로 경로 복원용은 아닙니다. 캐릭터의 통통 튀는 움직임과 일부 비행 높이는 재미를 위한 연출입니다.
+
+### 재생이나 영상 만들기가 느려요
+
+영상은 720p와 짧은 길이부터 시도하고, 지도 설정에서 2D로 전환해 볼 수 있습니다. 긴 여행과 사진이 많은 여행은 준비 시간이 더 필요합니다. 현재는 시험 배포 단계이며, 모든 기기의 지속 재생 성능을 확인한 상태는 아닙니다.
+
+문제가 계속되면 [문제·의견 보내기](https://github.com/HyeokjaeKwon26/My-Travel-Diary-3D/issues)에 **기기 이름, 앱 버전, 문제가 생긴 순서**를 알려 주세요. 스크린샷을 첨부할 때는 집 주소나 개인 사진 등 공개하고 싶지 않은 정보를 가려 주세요.
+
+---
+
+[앱 소개](../README.md) · [다운로드](https://github.com/HyeokjaeKwon26/My-Travel-Diary-3D/releases) · [개인정보 안내](PRIVACY_3D.md) · [개발자 문서](DEVELOPMENT.md)
