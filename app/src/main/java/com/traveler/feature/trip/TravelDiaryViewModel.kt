@@ -45,34 +45,18 @@ class TravelDiaryViewModel(application: Application) : AndroidViewModel(applicat
     private var loadJob: kotlinx.coroutines.Job? = null
     private val _photoPreparation = MutableStateFlow("")
     val photoPreparation: StateFlow<String> = _photoPreparation.asStateFlow()
-    fun loadTrip(tripId: String) {
+    fun loadTrip(tripId: String, refreshPhotos: Boolean = false) {
         currentTripId = tripId
         loadJob?.cancel()
         loadJob = viewModelScope.launch {
+            _photoPreparation.value = ""
             _uiState.value = TripDetailUiState.Loading
             try {
                 val trip = repository.getTripById(tripId)
                 if (trip != null) {
-                    val originals = trip.days.flatMap { day -> day.items.flatMap { item ->
-                        when(item) {
-                            is TripDayItem.VisitItem -> item.photos
-                            is TripDayItem.MovementItem -> item.photos
-                            is TripDayItem.ContextualPhotosItem -> item.photos
-                            is TripDayItem.UnassignedPhotosItem -> item.photos
-                        }
-                    } }.distinctBy { it.id }
-                    val analyzed = com.traveler.core.media.PhotoVisualAnalyzer(getApplication()).analyze(originals) { done,total ->
-                        _photoPreparation.value = "Choosing memories on this device · $done / $total"
-                    }.associateBy { it.id }
-                    fun photos(items: List<MediaItem>) = items.map { analyzed[it.id] ?: it }
-                    val prepared = trip.copy(days = trip.days.map { day -> day.copy(items=day.items.map { item ->
-                        when(item) {
-                            is TripDayItem.VisitItem -> item.copy(photos=photos(item.photos))
-                            is TripDayItem.MovementItem -> item.copy(photos=photos(item.photos))
-                            is TripDayItem.ContextualPhotosItem -> item.copy(photos=photos(item.photos))
-                            is TripDayItem.UnassignedPhotosItem -> item.copy(photos=photos(item.photos))
-                        }
-                    }) })
+                    val prepared = com.traveler.core.media.tripMemoryStore(getApplication()).prepare(trip, refreshPhotos) { done, total ->
+                        _photoPreparation.value = "사진 구성 준비 중 · $done / $total"
+                    }
                     _photoPreparation.value = ""
                     _uiState.value = TripDetailUiState.Success(prepared)
                 } else {
@@ -84,6 +68,8 @@ class TravelDiaryViewModel(application: Application) : AndroidViewModel(applicat
             }
         }
     }
+
+    fun refreshMemories() { currentTripId?.let { loadTrip(it, refreshPhotos = true) } }
 
     fun focusLocation(point: GeoPoint) {
         _focusedLocation.value = point

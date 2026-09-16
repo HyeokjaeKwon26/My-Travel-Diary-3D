@@ -43,6 +43,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
     fun deleteTrip(tripId: String) {
         viewModelScope.launch {
             repository.deleteTrip(tripId)
+            com.traveler.core.media.tripMemoryStore(getApplication()).delete(tripId)
         }
     }
 }

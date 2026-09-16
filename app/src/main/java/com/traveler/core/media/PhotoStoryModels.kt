@@ -45,6 +45,7 @@ data class PhotoMomentCluster(
  * 2. An active photo moment is a pure UI overlay and does NOT mutate currentStoryTimestamp,
  *    StoryNode index, route progress, or route marker position.
  */
+@kotlinx.serialization.Serializable
 data class PhotoStoryMoment(
     val mediaId: String,
     val photo: MediaItem,

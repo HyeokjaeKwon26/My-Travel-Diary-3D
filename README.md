@@ -2,7 +2,7 @@
 
 An independent Android 3D edition of [My Travel Diary](https://github.com/HyeokjaeKwon26/My-Travel-Diary), based on original commit `9bcfb4f`.
 
-**Version: 1.0.0-rc10.** Photo-safe viewing, route overview postcards, movement-photo pauses, KTX-inspired trains, animated video covers, persistent trip sorting, accurate recorded-visit summaries, compact playback overlays, non-blocking background map preparation, bounded 2D drawing, automatic north-up route framing, adaptive phone/tablet layouts, calendar dates, local visual photo selection, and portrait/landscape video creation and playback. Physical-device acceptance is pending; Galaxy S23 Ultra is the primary target. See [validation and remaining work](docs/PRODUCTION_STATUS.md).
+**Version: 1.0.0-rc11.** Saved photo selections, fullscreen live playback with elapsed/total time, photo-safe viewing, route overview postcards, movement-photo pauses, KTX-inspired trains, animated video covers, persistent trip sorting, accurate recorded-visit summaries, compact playback overlays, non-blocking background map preparation, bounded 2D drawing, automatic north-up route framing, adaptive phone/tablet layouts, calendar dates, local visual photo selection, and portrait/landscape video creation and playback. Physical-device acceptance is pending; Galaxy S23 Ultra is the primary target. See [validation and remaining work](docs/PRODUCTION_STATUS.md).
 
 ## 한국어
 

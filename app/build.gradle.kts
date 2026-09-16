@@ -21,8 +21,8 @@ android {
         targetSdk = 36
         // Optional device-specific distribution APK; CI/default keeps all supported ABIs.
         providers.gradleProperty("targetAbi").orNull?.let { ndk.abiFilters.add(it) }
-        versionCode = 11
-        versionName = "1.0.0-rc10"
+        versionCode = 12
+        versionName = "1.0.0-rc11"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {

@@ -59,6 +59,10 @@ fun TravelDiaryScreen(
 
     var viewingGalleryPhotos by remember { mutableStateOf<List<MediaItem>?>(null) }
     var isExportVideoOpen by remember { mutableStateOf(false) }
+    var fullscreen by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(false) }
+    var showRefreshConfirmation by remember { mutableStateOf(false) }
+    androidx.activity.compose.BackHandler(fullscreen) { fullscreen = false }
+    com.traveler.feature.map.PlaybackFullscreenEffect(fullscreen)
     var showMapOptions by remember { mutableStateOf(false) }
 
     LaunchedEffect(tripId) {
@@ -67,7 +71,7 @@ fun TravelDiaryScreen(
 
     Scaffold(
         topBar = {
-            TopAppBar(
+            if (!fullscreen) TopAppBar(
                 title = {
                     val title = (uiState as? TripDetailUiState.Success)?.trip?.title ?: "Travel Diary"
                     Text(title, fontWeight = FontWeight.Bold, maxLines = 1)
@@ -79,6 +83,7 @@ fun TravelDiaryScreen(
                 },
                 actions = {
                     if (uiState is TripDetailUiState.Success) {
+                        TextButton(onClick = { showRefreshConfirmation = true }) { Text("사진 다시 고르기", fontSize = 11.sp) }
                         IconButton(onClick = { showMapOptions = true }) {
                             Icon(Icons.Default.Settings, contentDescription = "Map settings")
                         }
@@ -144,7 +149,7 @@ fun TravelDiaryScreen(
                         }
                     }
 
-                    AdaptiveDiaryLayout(map = {
+                    AdaptiveDiaryLayout(fullscreen = fullscreen, map = {
                         // 1. Offline Vector Map & Cinematic Playback Header
                         TravelMapView(
                             visits = allVisits,
@@ -152,6 +157,9 @@ fun TravelDiaryScreen(
                             photos = allPhotos,
                             focusedLocation = focusedLocation,
                             tripStartDateIso = trip.startDateIso,
+                            photoSelections = trip.memorySnapshot?.selections,
+                            fullscreen = fullscreen,
+                            onToggleFullscreen = { fullscreen = !fullscreen },
                             showMapOptions = showMapOptions,
                             onDismissMapOptions = { showMapOptions = false },
                             modifier = Modifier.fillMaxSize()
@@ -269,6 +277,14 @@ fun TravelDiaryScreen(
                 }
             }
 
+            if (showRefreshConfirmation) {
+                AlertDialog(onDismissRequest = { showRefreshConfirmation = false },
+                    title = { Text("사진 다시 고르기") },
+                    text = { Text("사진을 다시 분석해 자동 선택을 갱신합니다. 직접 지정한 대표 사진은 유지되며, 사진 수에 따라 시간이 걸릴 수 있습니다.") },
+                    confirmButton = { TextButton(onClick = { showRefreshConfirmation = false; viewModel.refreshMemories() }) { Text("다시 고르기") } },
+                    dismissButton = { TextButton(onClick = { showRefreshConfirmation = false }) { Text("취소") } })
+            }
+
             // Fullscreen Immersive Photo Detail Dialog
             selectedPhoto?.let { photo ->
                 FullscreenPhotoDialog(
@@ -307,7 +323,8 @@ fun TravelDiaryScreen(
                 val renderModel = TravelMapRenderModel(
                     visits = visits,
                     segments = segments,
-                    photos = photos
+                    photos = photos,
+                    photoSelections = successTrip.memorySnapshot?.selections
                 )
                 com.traveler.feature.video.ui.ExportVideoDialog(
                     trip = successTrip,

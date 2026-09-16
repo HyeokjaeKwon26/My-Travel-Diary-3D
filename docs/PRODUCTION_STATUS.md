@@ -1,3 +1,30 @@
+# 1.0.0-rc11 saved memories and fullscreen playback
+
+Photo analysis and per-profile photo selections now live in atomic, durable journey files under filesDir, outside Android's evictable cache. Existing journeys prepare this once; new imports prepare it while saving. Reopening unchanged metadata reads the saved selection without MediaStore queries, thumbnail decoding or ML inference. Failed analysis results are also frozen instead of silently changing on the next open. Saved photo additions/removals and representative overrides invalidate selection; only new/changed sources need analysis. Explicit photo refresh bypasses the descriptor cache and preserves manual representative flags. Deleting a journey removes its saved memory file. External gallery edits are picked up through explicit refresh; this does not add newly captured gallery photos to an already imported journey.
+
+All three story profiles persist their raw selected moments before scheduling. Live playback and video export consume the same selection. Metadata-derived input signatures and a serialized write lock avoid partially written or concurrently replaced results; cancellation before replacement leaves the previous saved version intact. No Room schema migration is required. Backups retain their existing format; restored journeys prepare their local memory file on first open.
+
+Fullscreen expands the existing map composition in place, hides the diary and top app bar, and permits sensor-driven portrait/landscape rotation. Fullscreen exit and Android Back return to the diary without resetting the playback position. System bars and orientation policy are restored on exit. The playback bar shows current story time / total story time, including photo holds and title/end durations. Speed changes affect advancement, not the displayed timeline length; exports using a different duration profile have their own length.
+
+## RC11 verification
+
+- 337 JVM tests passed with zero failures/errors/skips. New tests cover durable selections after store recreation, cached failed-analysis outcomes, all three playback profiles, incremental analysis of added sources, removed sources, representative overrides, explicit refresh, cancellation preserving the old file, deletion and elapsed/total clock formatting.
+- Five distinct Android cases passed across runs: fullscreen expansion/landscape configuration change/Back preserves timeline position and clock, pause survives rotation, playback resumes and advances, plus four existing photo/date/seek overlay regressions. [Live portrait](verification-3d/rc11-fullscreen-portrait.png), [landscape](verification-3d/rc11-fullscreen-landscape.png).
+- A saved 835.5 km / 4-photo journey was opened, closed, reopened, force-stopped and opened again. Its 9,389-byte saved memory file retained the same SHA-256 and modification time throughout, confirming reuse rather than a rewritten selection. Both existing sample journeys and their list sorting survived the debug update.
+- Initial incremental compilation mixed old Kotlin constructor calls with changed model signatures; a full non-incremental compilation resolved these NoSuchMethodError test failures. The first fullscreen Android run passed expansion/position checks but timed out on UiDevice rotation: FULL_SENSOR ignores user-rotation locks. The rerun requested an actual landscape configuration change and passed. An emulator System UI ANR at cold boot was dismissed before acceptance. These failed attempts are not counted as passes.
+- Optimized universal/ARM64 release builds, signing certificate, package/version, resource/JNI contracts, ABI sets, APK ZIP alignment and 64-bit ELF 16 KiB alignment checks passed. Final lint has 0 errors, 89 warnings and 8 informational findings. Physical S23 Ultra remains unavailable; remote CI is not counted as passed while running.
+
+- Final production-signed universal RC11 installed over the existing app without removal. Both 31.2 km / 0-photo and 835.5 km / 4-photo saved journeys and name/ascending sorting remained. The photo journey opened successfully; play/pause/fullscreen and the 0:09 / 0:52 clock were inspected in the optimized release. [Signed fullscreen](verification-3d/rc11-signed-fullscreen.png). Remote GitHub run `35159228201` remained in progress at acceptance and is not counted as passed.
+
+## RC11 packages
+
+Application source: `85635db` (later commits change tests/docs only). Both packages use `com.traveler.threed`, version code 12 / `1.0.0-rc11` and the existing production signing certificate.
+
+- `My-Travel-Diary-3D-1.0.0-rc11.apk`: 89431167 bytes; SHA-256 `11868caf67e9be2f59f3cceb40e00e17d5a1815d3c796718d44f43a4959506b0`.
+- `My-Travel-Diary-3D-1.0.0-rc11-arm64.apk`: 55917957 bytes; SHA-256 `c3868d10a8572c431dd189b14d4798a7a4d59a2ba703e4e1812cd7e56f806c66`.
+
+---
+
 # 1.0.0-rc10 diary and video presentation
 
 Date: 2026-09-16. Photo details now reserve the union of host-window and dialog safe insets, with a pinned representative-photo action and independently scrollable metadata. The last recorded Home card replaces its media thumbnail with a bounded 960×540 offline whole-route overview; original photos remain available through a gallery button. The overview fits actual journey bounds, including short trips, without the live map’s regional minimum scale. No map-provider or live-camera changes were made.

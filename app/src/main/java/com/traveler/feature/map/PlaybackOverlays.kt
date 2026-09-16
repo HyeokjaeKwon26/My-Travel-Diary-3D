@@ -61,7 +61,7 @@ internal fun PlaybackOverlays(state: TravelPlaybackState, timeline: TravelStoryT
                 val top = headerHeight + 24.dp
                 val maxPhotoWidth = minOf(180.dp, maxWidth * .38f)
                 // Reserve controls and credits; photos have no redundant Stop caption.
-                val available = (maxHeight - top - 90.dp).coerceAtLeast(0.dp)
+                val available = (maxHeight - top - 120.dp).coerceAtLeast(0.dp)
                 val maxPhotoHeight = minOf(180.dp, maxHeight * .38f, available)
                 if (maxPhotoHeight >= 24.dp) {
                     val fitted = PlaybackOverlayContent.fitPhoto(aspect, 1f, maxPhotoWidth.value, maxPhotoHeight.value)

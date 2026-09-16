@@ -20,7 +20,8 @@ data class Trip(
     val movementDiagnostics: CanonicalTimelineDiagnostics? = null,
     val createdAtEpochMs: Long = System.currentTimeMillis(),
     // Derived from saved visits, never from the legacy five-name cache or an archived summary.
-    @kotlinx.serialization.Transient val visitSummary: TripVisitSummary = TripVisitSummary()
+    @kotlinx.serialization.Transient val visitSummary: TripVisitSummary = TripVisitSummary(),
+    @kotlinx.serialization.Transient val memorySnapshot: com.traveler.core.media.TripMemorySnapshot? = null
 )
 
 @Serializable

@@ -21,7 +21,7 @@ import java.io.File
 import java.security.MessageDigest
 
 /** One thumbnail at a time. Results survive restarts; originals are never uploaded. */
-class PhotoVisualAnalyzer(private val context: Context) {
+class PhotoVisualAnalyzer(private val context: Context, private val useCache: Boolean = true) {
     private val directory=File(context.cacheDir,"photo_features_v1").apply { mkdirs() }
     private val json=Json { ignoreUnknownKeys=true }
     suspend fun analyze(items: List<MediaItem>, progress: (Int,Int)->Unit = {_,_->}): List<MediaItem> = withContext(Dispatchers.IO) {
@@ -36,7 +36,7 @@ class PhotoVisualAnalyzer(private val context: Context) {
                     val uri=Uri.parse(item.contentUriString)
                     val key=fingerprint(uri,item)
                     val cached=File(directory,"$key.json")
-                    if(cached.isFile) runCatching { json.decodeFromString<PhotoVisualFeatures>(cached.readText()) }.getOrNull()
+                    if(useCache && cached.isFile) runCatching { json.decodeFromString<PhotoVisualFeatures>(cached.readText()) }.getOrNull()
                         ?.takeIf { it.labelsComputed }?.let { return@mapIndexed item.copy(visualFeatures=it) }
                     val bitmap=thumbnail(uri) ?: return@mapIndexed item
                     try {

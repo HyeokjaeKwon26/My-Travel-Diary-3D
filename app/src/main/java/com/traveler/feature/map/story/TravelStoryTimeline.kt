@@ -477,6 +477,33 @@ class TravelStoryTimeline private constructor(
     }
 
     companion object {
+        /** Persist these raw selections before scheduling; all playback/export profiles reuse them. */
+        fun selectPhotoMoments(renderModel: TravelMapRenderModel, profile: StoryDurationProfile): List<PhotoStoryMoment> {
+            val canonicalSegments = CanonicalTimelineValidator.requireNonOverlapping(
+                if (CanonicalTimelineValidator.countOverlapViolations(renderModel.segments) == 0) {
+                    renderModel.segments
+                } else {
+                    MovementTimelineCanonicalizer.canonicalize(renderModel.segments).canonicalSegments
+                }
+            ).sortedBy { it.startTimestampEpochMs }
+
+            val canonicalVisits = CanonicalVisitTimelineValidator.requireNonOverlapping(
+                if (CanonicalVisitTimelineValidator.countOverlapViolations(renderModel.visits) == 0) {
+                    renderModel.visits
+                } else {
+                    VisitCandidateCanonicalizer.deduplicate(renderModel.visits)
+                }
+            ).sortedBy { it.startTimestampEpochMs }
+
+            // Cross-Type Temporal Overlap Resolution (Pass 21.8b):
+            // Split any movement segments that overlap with intermediate visits so that
+            // visits and movements interleave in strictly non-overlapping, true chronological order.
+            val resolvedSegments = resolveCrossTypeTemporalOverlaps(canonicalSegments, canonicalVisits)
+
+            return PhotoStoryEngine.buildGlobalPhotoStoryMoments(canonicalVisits, resolvedSegments, renderModel.photos, profile)
+        }
+
+
         /**
          * Builds a deterministic [TravelStoryTimeline] from render model data and duration profile.
          */
@@ -508,7 +535,7 @@ class TravelStoryTimeline private constructor(
             val resolvedSegments = resolveCrossTypeTemporalOverlaps(canonicalSegments, canonicalVisits)
 
             // Precompute globally sorted representative photo moments (P0-03 ~ P0-05)
-            val photoMoments = PhotoStoryEngine.buildGlobalPhotoStoryMoments(
+            val photoMoments = renderModel.photoSelections?.get(profile.name) ?: PhotoStoryEngine.buildGlobalPhotoStoryMoments(
                 visits = canonicalVisits,
                 segments = resolvedSegments,
                 allPhotos = renderModel.photos,

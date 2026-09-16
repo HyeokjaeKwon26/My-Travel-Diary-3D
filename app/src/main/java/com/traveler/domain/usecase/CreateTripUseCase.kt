@@ -35,7 +35,8 @@ class CreateTripUseCase(
     private val transportClassifier: TransportClassifier,
     private val tripRepository: TripRepository,
     private val timezoneResolver: TimezoneResolver = GeoTimezoneEngine,
-    private val analyzePhotos: suspend (List<MediaItem>, (Int,Int)->Unit) -> List<MediaItem> = { photos, _ -> photos }
+    private val analyzePhotos: suspend (List<MediaItem>, (Int,Int)->Unit) -> List<MediaItem> = { photos, _ -> photos },
+    private val prepareMemories: suspend (Trip) -> Trip = { it }
 ) {
 
     suspend fun execute(
@@ -488,7 +489,7 @@ class CreateTripUseCase(
 
             // Save trip to Room database
             report("Saving travel story…", .98f)
-            tripRepository.saveTrip(trip)
+            tripRepository.saveTrip(prepareMemories(trip))
             report("Travel story saved", 1f)
 
             trip
