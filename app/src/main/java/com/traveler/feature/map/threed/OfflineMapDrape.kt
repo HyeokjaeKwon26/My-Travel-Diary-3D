@@ -27,7 +27,9 @@ class OfflineMapDrape(context: Context) {
 
     fun window(latitude: Double, longitude: Double, distance: Double, aspect: Double): Window {
         val p = WebMercator.project(latitude, longitude)
-        val span = (distance * 2.0 * max(1.0, aspect) /
+        // The oblique chase camera sees farther ahead and to the side than a
+        // straight rear view. Cover that frustum before falling back to the globe.
+        val span = (distance * 3.5 * max(1.0, aspect) /
             (2 * PI * cos(Math.toRadians(latitude)).coerceAtLeast(.08))).coerceIn(.0002, .45)
         return Window(p.x - span / 2, p.y - span / 2, span)
     }

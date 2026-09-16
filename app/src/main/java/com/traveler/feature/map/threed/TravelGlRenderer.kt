@@ -32,7 +32,7 @@ class TravelGlRenderer(private val context: Context, val scene: SceneGeometry) {
     private var world: Mesh? = null
     private val terrain = linkedMapOf<Int,Mesh>()
     private var routes = emptyList<Mesh>()
-    private val vehicleBuffer = ByteBuffer.allocateDirect(256 * 36).order(ByteOrder.nativeOrder()).asFloatBuffer()
+    private val vehicleBuffer = ByteBuffer.allocateDirect(16384 * 36).order(ByteOrder.nativeOrder()).asFloatBuffer()
     private var positionAttribute=0; private var colorAttribute=0; private var uvAttribute=0
     private var matrixUniform=0; private var textureUniform=0; private var useTextureUniform=0; private var alphaUniform=0
 
@@ -115,21 +115,19 @@ class TravelGlRenderer(private val context: Context, val scene: SceneGeometry) {
         GL.glClear(GL.GL_COLOR_BUFFER_BIT or GL.GL_DEPTH_BUFFER_BIT)
         GL.glEnable(GL.GL_DEPTH_TEST); GL.glDepthFunc(GL.GL_LEQUAL)
         GL.glEnable(GL.GL_BLEND); GL.glBlendFunc(GL.GL_SRC_ALPHA,GL.GL_ONE_MINUS_SRC_ALPHA)
-        val point=state?.currentPosition
         val routeIndex=scene.routes.indexOfFirst { it.episodeIndex==state?.episodeIndex && it.id==state.currentSegment?.id }
-        val route=scene.routes.getOrNull(routeIndex)
-        val routeFraction=if(route!=null && state!=null) ((state.storyTimeMs-route.startMs).toDouble()/max(1,route.endMs-route.startMs)).coerceIn(0.0,1.0) else 0.0
-        val surface=point?.let { scene.surface(it) } ?: 0.0
         val flight=state?.currentTransportMode==TransportMode.AIRPLANE
-        val lift=if(flight && point?.altitudeMeters==null && route!=null)
-            sin(PI*routeFraction)*min(600_000.0,max(12_000.0,(route.xyz.last()-route.xyz.first()).length()*EarthGeometry.R*.05)) else 0.0
-        val focus=state?.let { scene.routePosition(it) } ?: if(point!=null) EarthGeometry.position(point,surface+lift+12) else scene.overviewCenter
+        val motion=state?.let { scene.motion(it) }
+        val focus=motion?.position ?: scene.overviewCenter
         val up=focus.unit()
-        val forward=if(point!=null) EarthGeometry.forward(point,if(calm) 0.0 else state.currentHeadingDegrees.toDouble()) else Vec3(0.0,1.0,0.0)
+        val centerPoint=GeoPoint(Math.toDegrees(asin(up.y)),Math.toDegrees(atan2(-up.z,up.x)))
+        // North-up changes only the camera, never the vehicle's route heading.
+        val forward=if(calm || motion==null) EarthGeometry.north(centerPoint) else motion.forward
         val distance=if(state==null) scene.overviewDistance else if(flight)
             (state.cameraSpanLat*111000/EarthGeometry.R*1.3).coerceIn(.04,2.8) else
             (state.cameraSpanLat*111000/EarthGeometry.R).coerceIn(.0008,.006)
-        var eye=focus+up*(distance*.8)-forward*(distance*.7)
+        val cameraRight=forward.cross(up).unit()
+        var eye=focus+up*(distance*.65)-forward*(distance*.75)+cameraRight*(if(calm || state==null)0.0 else distance*.5)
         if(distance<.1) {
             val radial=eye.unit()
             val eyePoint=GeoPoint(Math.toDegrees(asin(radial.y)),Math.toDegrees(atan2(-radial.z,radial.x)))
@@ -161,46 +159,32 @@ class TravelGlRenderer(private val context: Context, val scene: SceneGeometry) {
             val alpha=if(state==null) .85f else if(i==routeIndex) 1f else if(r.endMs<=state.storyTimeMs) .22f else 0f
             if(alpha>0) { GL.glLineWidth(if(i==routeIndex) 4f else 2f); draw(mesh,if(r.mode==TransportMode.AIRPLANE) GL.GL_LINES else GL.GL_TRIANGLES,alpha) }
         }
-        if(state!=null && !scene.uncertain(state)) {
-            val modelSize=distance*.018
-            val front=forward.unit(); val right=front.cross(up).unit()
-            val slopePoint=route?.points?.let { ps -> ps.getOrNull(min(ps.lastIndex,(routeFraction*ps.lastIndex).toInt()+1)) }
-            val slope=if(point!=null && slopePoint!=null && !flight) {
-                val dz=scene.surface(slopePoint)-surface
-                val horizontal=com.traveler.core.common.geo.GeodesicUtils.distanceMeters(point,slopePoint)
-                atan2(dz,max(20.0,horizontal)).coerceIn(-.35,.35)
-            } else 0.0
-            val pitched=(front*cos(slope)+up*sin(slope)).unit()
-            val values=ArrayList<Float>()
-            fun v(x:Double,y:Double,z:Double)=focus+right*(x*modelSize)+up*(y*modelSize)+pitched*(z*modelSize)
-            val color=floatArrayOf(1f,.78f,.25f,1f)
-            fun tri(a:Vec3,b:Vec3,c:Vec3,col:FloatArray=color) { vertex(values,a,col);vertex(values,b,col);vertex(values,c,col) }
-            if(flight) {
-                tri(v(0.0,.2,2.8),v(-.35,.2,-1.6),v(.35,.2,-1.6))
-                tri(v(-2.3,.2,-.6),v(0.0,.2,1.0),v(2.3,.2,-.6))
-                tri(v(0.0,.2,-.6),v(0.0,1.2,-1.6),v(0.0,.2,-1.7))
-            } else {
-                val pts=listOf(v(-.7,.2,-1.3),v(.7,.2,-1.3),v(.7,.2,1.3),v(-.7,.2,1.3),v(-.6,1.0,-.9),v(.6,1.0,-.9),v(.6,1.0,.6),v(-.6,1.0,.6))
-                val faces=listOf(intArrayOf(0,1,5,4),intArrayOf(1,2,6,5),intArrayOf(2,3,7,6),intArrayOf(3,0,4,7),intArrayOf(4,5,6,7))
-                faces.forEachIndexed { index,face ->
-                    val shade=listOf(.65f,.78f,.88f,.72f,1f)[index]
-                    val faceColor=floatArrayOf(color[0]*shade,color[1]*shade,color[2]*shade,1f)
-                    tri(pts[face[0]],pts[face[1]],pts[face[2]],faceColor)
-                    tri(pts[face[0]],pts[face[2]],pts[face[3]],faceColor)
-                }
-                val glass=floatArrayOf(.08f,.22f,.3f,1f)
-                tri(v(-.5,1.01,.2),v(.5,1.01,.2),v(.5,1.01,.55),glass)
-                tri(v(-.5,1.01,.2),v(.5,1.01,.55),v(-.5,1.01,.55),glass)
-                // Four dark wheel faces, visible even at the small overview scale.
-                for(x in listOf(-.73,.73)) for(z in listOf(-.8,.8)) {
-                    tri(v(x,.05,z-.24),v(x,.46,z-.24),v(x,.46,z+.24),glass)
-                    tri(v(x,.05,z-.24),v(x,.46,z+.24),v(x,.05,z+.24),glass)
-                }
-            }
+        if(state!=null && motion!=null && !scene.uncertain(state)) {
+            val mode=state.currentTransportMode
+            val modelSize=VehicleAnimation.scale(distance,width,height,mode)
+            val pose=VehicleAnimation.pose(mode,state.progress.toDouble()*scene.timeline.totalStoryDurationSeconds,
+                motion.slope,motion.turn,state.currentSegment!=null)
+            val front=motion.forward.unit();val right=front.cross(up).unit()
+            val pitchedFront=front*cos(pose.pitch)+up*sin(pose.pitch)
+            val pitchedUp=up*cos(pose.pitch)-front*sin(pose.pitch)
+            val rolledRight=right*cos(pose.roll)+pitchedUp*sin(pose.roll)
+            val rolledUp=pitchedUp*cos(pose.roll)-right*sin(pose.roll)
+            val origin=focus+up*(modelSize*(.15+pose.bounce))
+            val toy=ToyVehicle.mesh(mode,pose.phase)
+            check(toy.size/7<=16384)
             vehicleBuffer.clear()
-            values.forEach { vehicleBuffer.put(it) }
+            for(i in toy.indices step 7) {
+                val p=origin+rolledRight*(toy[i]*modelSize)+rolledUp*(toy[i+1]*modelSize*pose.stretch)+
+                    pitchedFront*(toy[i+2]*modelSize)
+                vehicleBuffer.put(p.x.toFloat()).put(p.y.toFloat()).put(p.z.toFloat())
+                for(c in 3..6) vehicleBuffer.put(toy[i+c])
+                vehicleBuffer.put(0f).put(0f)
+            }
             vehicleBuffer.position(0)
-            draw(Mesh(vehicleBuffer, values.size / 9),GL.GL_TRIANGLES)
+            // Oversized story markers must remain legible even where their wheels
+            // overlap relief. Keep depth within the solid toy for correct 3D faces.
+            GL.glClear(GL.GL_DEPTH_BUFFER_BIT)
+            draw(Mesh(vehicleBuffer,toy.size/7),GL.GL_TRIANGLES)
         }
         GL.glDisable(GL.GL_DEPTH_TEST)
     }
