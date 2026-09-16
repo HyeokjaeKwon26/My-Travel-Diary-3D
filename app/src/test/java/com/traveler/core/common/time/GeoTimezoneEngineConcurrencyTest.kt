@@ -3,7 +3,6 @@ package com.traveler.core.common.time
 import com.traveler.core.common.geo.GeoPoint
 import kotlinx.coroutines.*
 import kotlinx.coroutines.test.runTest
-import net.iakovlev.timeshape.TimeZoneEngine
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -25,7 +24,7 @@ class GeoTimezoneEngineConcurrencyTest {
         GeoTimezoneEngine.engineFactory = {
             initCount.incrementAndGet()
             Thread.sleep(50) // Simulate TimeShape polygon parsing latency
-            TimeZoneEngine.initialize()
+            RegionalTimezoneLookup()
         }
 
         // Launch 20 concurrent coroutines invoking initializeAsync, resolve, and resolveSync

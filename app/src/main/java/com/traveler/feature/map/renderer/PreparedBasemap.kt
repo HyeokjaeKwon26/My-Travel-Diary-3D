@@ -289,7 +289,7 @@ object BasemapParser {
 /**
  * Application/Session-level cache for the 10m regional basemap (P0-06, P0-07).
  *
- * Ensures the ~26MB JSON asset is parsed at most ONCE across the entire application lifecycle,
+ * Reuses the same preprojected binary arrays as the 3D renderer,
  * exclusively off the Android main thread, without leaking Context.
  */
 object RegionalBasemapCache {
@@ -314,10 +314,8 @@ object RegionalBasemapCache {
 
             withContext(Dispatchers.Default) {
                 try {
-                    context.applicationContext.assets.open("basemap_regional.json").use { stream ->
-                        val prepared = BasemapParser.parse(stream)
-                        preparedRegionalBasemap = prepared
-                        prepared
+                    BundledBasemapCache.load(context.applicationContext).first.also {
+                        preparedRegionalBasemap = it
                     }
                 } catch (_: Exception) {
                     null

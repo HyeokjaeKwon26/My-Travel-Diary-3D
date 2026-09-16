@@ -25,6 +25,32 @@ import java.util.concurrent.atomic.AtomicInteger
 @RunWith(AndroidJUnit4::class)
 class StreetMapAndroidTest {
     private val context get()=InstrumentationRegistry.getInstrumentation().targetContext
+    @Test fun cancelledViewportCanBeRequestedAgainWithoutFailureCooldown() {
+        val root=File(context.cacheDir,"cancel-revisit-${System.nanoTime()}").apply { mkdirs() }
+        val started=java.util.concurrent.CountDownLatch(1)
+        val release=java.util.concurrent.CountDownLatch(1)
+        val count=AtomicInteger()
+        val tile=StreetTile(12,8,8);val plan=StreetTilePlan(listOf(tile),12)
+        val session=StreetMapSession(context,true,root,connectionFactory={
+            val index=count.incrementAndGet()
+            object:HttpURLConnection(URL("https://fixture.invalid/tile")) {
+                override fun connect() {}
+                override fun usingProxy()=false
+                override fun disconnect() { if(index==1) release.countDown() }
+                override fun getResponseCode():Int {
+                    if(index==1) { started.countDown();release.await(5,java.util.concurrent.TimeUnit.SECONDS) }
+                    return 500
+                }
+            }
+        })
+        try {
+            session.request(plan);assertTrue(started.await(5,java.util.concurrent.TimeUnit.SECONDS))
+            session.request(StreetTilePlan(emptyList(),12))
+            session.request(plan)
+            awaitCondition { count.get()>=2 }
+        } finally { release.countDown();session.close();root.deleteRecursively() }
+    }
+
     private fun fixture():Bitmap=Bitmap.createBitmap(256,256,Bitmap.Config.ARGB_8888).also {
         val canvas=Canvas(it);canvas.drawColor(Color.rgb(236,224,245))
         val paint=Paint(Paint.ANTI_ALIAS_FLAG).apply { color=Color.WHITE;strokeWidth=14f }
@@ -89,7 +115,7 @@ class StreetMapAndroidTest {
                 awaitCondition { session.detailCount==batch.size }
                 // Ensure the next equal-size batch is not mistaken for this batch.
                 session.request(StreetTilePlan(emptyList(),15))
-                assertEquals(0,session.detailCount)
+                awaitCondition { session.detailCount==0 }
             }
             session.setActive(true)
             session.request(StreetTilePlan(listOf(tiles.first()),15))

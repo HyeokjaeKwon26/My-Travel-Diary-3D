@@ -2,7 +2,6 @@ package com.traveler.core.common.time
 
 import com.traveler.core.common.geo.GeoPoint
 import kotlinx.coroutines.*
-import net.iakovlev.timeshape.TimeZoneEngine
 import java.time.ZoneId
 import java.util.Collections
 import java.util.LinkedHashMap
@@ -13,13 +12,13 @@ object GeoTimezoneEngine : TimezoneResolver {
     private val applicationScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
     private sealed interface EngineState {
-        data class Success(val engine: TimeZoneEngine) : EngineState
+        data class Success(val engine: TimezoneLookup) : EngineState
         data class Failure(val reason: String) : EngineState
     }
 
     // Factory hook to allow deterministic unit testing of single-flight guarantees
-    var engineFactory: () -> TimeZoneEngine? = {
-        TimeZoneEngine.initialize()
+    var engineFactory: () -> TimezoneLookup? = {
+        RegionalTimezoneLookup()
     }
 
     // Single-flight deferred initialization across the entire process lifetime
@@ -66,6 +65,7 @@ object GeoTimezoneEngine : TimezoneResolver {
      * Resets the engine deferred instance (used primarily in test suites).
      */
     fun resetForTesting() {
+        engineFactory = { RegionalTimezoneLookup() }
         sessionCount.set(0)
         cache.clear()
         engineDeferred = createDeferredEngine()
@@ -91,7 +91,7 @@ object GeoTimezoneEngine : TimezoneResolver {
 
     /**
      * Releases the TimeShape resident memory structures after batch trip import.
-     * Allows Java GC to reclaim ~100MB+ of spatial polygon index data when idle.
+     * Allows Java GC to reclaim the most recently used regional polygon index when idle.
      */
     fun releaseEngine() {
         cache.clear()
@@ -103,7 +103,7 @@ object GeoTimezoneEngine : TimezoneResolver {
     }
 
     /**
-     * Initializes the TimeShape worldwide timezone engine asynchronously on background thread.
+     * Initializes the small worldwide region catalog on a background thread.
      * Guaranteed to never block the main UI thread, and shares the exact same single-flight initialization.
      */
     fun initializeAsync(onComplete: (() -> Unit)? = null) {

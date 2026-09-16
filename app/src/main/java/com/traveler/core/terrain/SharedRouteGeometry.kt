@@ -10,6 +10,20 @@ import kotlin.math.abs
 /** One horizontal path for map strokes, story motion, terrain and export.
  * Does not manufacture connectors or delete genuine return journeys. */
 object SharedRouteGeometry {
+    /** Display-only samples follow the same spherical interpolation as the moving marker. */
+    fun displayPath(segment: MovementSegment): List<GeoPoint> {
+        val points=path(segment)
+        if(segment.effectiveMode!=TransportMode.AIRPLANE || points.size<2) return points
+        return buildList {
+            add(points.first())
+            for(i in 1 until points.size) {
+                val a=points[i-1];val b=points[i]
+                val steps=kotlin.math.ceil(GeodesicUtils.distanceMeters(a,b)/20_000).toInt().coerceIn(1,1024)
+                for(step in 1..steps) add(GeodesicUtils.interpolate(a,b,step.toDouble()/steps))
+            }
+        }
+    }
+
     fun path(segment: MovementSegment): List<GeoPoint> {
         val raw=segment.rawPoints.sortedBy { it.timestampEpochMs }.distinctBy { it.timestampEpochMs }
         val rejected=raw.indices.filter { i ->

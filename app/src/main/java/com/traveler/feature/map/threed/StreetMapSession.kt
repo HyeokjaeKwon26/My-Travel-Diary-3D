@@ -31,8 +31,7 @@ class StreetMapSession(context:Context,private val network:Boolean=false,
     @Volatile private var active=network
     @Volatile private var closed=false
     @Volatile private var requestedTile:StreetTile?=null
-    private val bufferGate=MapBufferGate()
-    @Volatile var buffering=false;private set
+    @Volatile private var cancelling:HttpURLConnection?=null
     @Volatile private var connection:HttpURLConnection?=null
     @Volatile var status="Reference map · loading street detail";private set
     @Volatile var detailCount=0;private set
@@ -61,10 +60,23 @@ class StreetMapSession(context:Context,private val network:Boolean=false,
         }
     } }
 
-    fun setActive(value:Boolean) { active=network && value;if(!active) connection?.disconnect() }
+    private fun cancelConnection() {
+        val current=connection ?: return
+        if(cancelling===current) return
+        cancelling=current
+        Dispatchers.IO.dispatch(kotlin.coroutines.EmptyCoroutineContext,Runnable {
+            runCatching { current.disconnect() }
+        })
+    }
+    fun setActive(value:Boolean) {
+        val enabled=network && value
+        if(active==enabled) return
+        active=enabled
+        if(!enabled) cancelConnection()
+    }
     fun request(plan:StreetTilePlan) {
         wanted=plan
-        requestedTile?.let { if(it !in plan.tiles) connection?.disconnect() }
+        requestedTile?.let { if(it !in plan.tiles) cancelConnection() }
         if(!network) for(tile in plan.tiles) {
             for(depth in 3 downTo 1) if(tile.z>=depth) {
                 val parent=StreetTile(tile.z-depth,tile.x shr depth,tile.y shr depth)
@@ -72,22 +84,20 @@ class StreetMapSession(context:Context,private val network:Boolean=false,
             }
             if(snapshot?.contains(tile.key)==true && synchronized(lock) { tile !in bitmaps }) load(tile,false)
         }
-        updateStatus()
+        // Live status is published by the IO worker; never wait on atlas painting here.
+        if(!network) updateStatus()
     }
     private fun updateStatus() {
         if(closed) return
         val keys=wanted?.tiles.orEmpty()
         val count=synchronized(lock) { keys.count { it in bitmaps } }
         detailCount=count
-        val waiting=bufferGate.update(android.os.SystemClock.elapsedRealtime(), network && active && System.currentTimeMillis()>=blockedUntil,
-            keys.isNotEmpty() && count < keys.size)
-        if(buffering!=waiting) { buffering=waiting;changed() }
         val text=when {
             keys.isEmpty() -> "Globe overview · north up"
-            waiting -> "Preparing map $count/${keys.size} · playback waits"
             count==keys.size && count>0 -> "Street map · north up"
             count>0 -> "Street detail $count/${keys.size} · north up"
             !network -> "Reference map · street detail not cached"
+            network && active -> "Loading street detail · playback continues"
             else -> "Reference map · street detail needs internet"
         }
         if(status!=text) { status=text;changed() }
@@ -164,7 +174,14 @@ class StreetMapSession(context:Context,private val network:Boolean=false,
             checked[tile]=max(expires,now+60_000)
             trimDisk()
         } catch(_:Exception) { /* Cached map and bundled geography remain visible. */ }
-        finally { connection?.disconnect();connection=null;requestedTile=null;updateStatus() }
+        finally {
+            // A cancelled viewport request is not a server failure. Retrying a quick
+            // revisit must not be suppressed by the ordinary one-minute error cooldown.
+            val cancelled=(connection!=null && cancelling===connection) || !active
+            connection?.disconnect();connection=null;requestedTile=null
+            if(cancelled) checked.remove(tile)
+            updateStatus()
+        }
     }
     companion object { @Volatile private var blockedUntil=0L }
     private fun decode(file:File):Bitmap? = runCatching {
@@ -216,5 +233,5 @@ class StreetMapSession(context:Context,private val network:Boolean=false,
             }
         }
     }
-    fun close() { closed=true;active=false;connection?.disconnect();scope.cancel();synchronized(lock) { bitmaps.values.forEach { it.recycle() };bitmaps.clear() } }
+    fun close() { closed=true;active=false;cancelConnection();scope.cancel();synchronized(lock) { bitmaps.values.forEach { it.recycle() };bitmaps.clear() } }
 }

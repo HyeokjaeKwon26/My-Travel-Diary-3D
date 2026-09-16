@@ -301,7 +301,7 @@ class TravelMapRenderer(
             val prov = seg.geometryProvenance
             val hasDetailedGeometry = seg.simplifiedPoints.size > 2 || seg.rawPoints.isNotEmpty()
 
-            val snappedPath = com.traveler.core.terrain.SharedRouteGeometry.path(seg)
+            val snappedPath = com.traveler.core.terrain.SharedRouteGeometry.displayPath(seg)
             allPoints.addAll(snappedPath)
 
             var totalDist = 0.0
@@ -397,6 +397,18 @@ class TravelMapRenderer(
     ) {
         if (width <= 0 || height <= 0) return
 
+        val saved = canvas.save()
+        try {
+            canvas.clipRect(0, 0, width, height)
+            renderClipped(canvas, width, height, renderModel, playbackState, insets)
+        } finally {
+            canvas.restoreToCount(saved)
+        }
+    }
+
+    private fun renderClipped(canvas: Canvas, width: Int, height: Int,
+                              renderModel: TravelMapRenderModel, playbackState: TravelPlaybackState?,
+                              insets: SafeContentInsets) {
         val prepared = prepareMap(renderModel)
 
         // 1. Draw Canvas background (Water / Ocean)

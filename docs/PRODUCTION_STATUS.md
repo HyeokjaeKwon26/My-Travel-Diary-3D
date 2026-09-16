@@ -1,6 +1,45 @@
-# 1.0.0-rc5 implementation and acceptance status
+# 1.0.0-rc6 implementation and acceptance status
 
 Date: 2026-09-16 (local). Target phone: Galaxy S23 Ultra. The user could not connect the phone during this session. This release candidate can be installed and used, but it is not a declaration that every criterion in the production readiness plan has passed.
+
+## RC6 playback and map bounds correction
+
+The user's 2D screenshot showed map outlines behind the diary. The shared parent intentionally had no Compose clipping because that previously hid the GLES SurfaceView, but the native 2D renderer had no separate clip. `TravelMapRenderer.render` now saves/restores Canvas state and clips every draw to its viewport. Sparse long flight strokes are sampled along the same spherical interpolation as the marker, including flights with more than two recorded points. Recorded data remains untouched. The diary also paints its own background; 3D's SurfaceView parent remains unchanged.
+
+Removed the network buffer gate and GPU map-readiness gate from live story/music playback. Missing tiles are a status only. Live atlas rasterization, tile compositing and local base-mesh construction run on a single bounded worker. Pending work is replaced with the newest viewport; stale completed viewports are discarded. Tile coverage compares sets, not request order. Socket cancellation is dispatched to IO and live status does not acquire the atlas painting lock on the render thread. Reference rasters, base meshes, bitmap buffers and GPU texture storage are reused. Preparation is coalesced to at most five starts per second and completion wakes a paused view. Exports retain synchronous frame preparation with the same map projection and frozen cache.
+
+The renderer still uses a 2048-pixel atlas and the same detailed-map source. There is no route prefetch, paid provider, new permission, database schema change, or change to recorded travel data. Version code 7 uses the existing production signing identity. The original 2D repository is untouched.
+
+A late signed-APK check found a real `OutOfMemoryError` with a 192 MiB app heap after switching between 2D/3D and creating the Boston/Niagara sample. The 2D loader independently parsed the large regional JSON while 3D retained the same map. Both now share one binary cache and identical coordinate arrays. That improvement alone did not resolve the crash: another signed run located the allocation failure in TimeShape's worldwide protobuf/polygon decoding. A 137,267-byte catalog generated from the pinned TimeShape 2026b.29 data now selects candidate archive entries before decoding; one regional engine is retained at a time, with serialized queries. The original full-resolution boundaries, timezone IDs, offshore semantics and map detail are preserved. No larger Android heap is requested.
+
+Changing developer display size and density together recreated the activity and once left the new GLES surface blank until the map was selected again. MainActivity now handles density and font-scale changes in place, as it already does orientation and window size; Compose receives the new configuration while retaining the map surface and playback state.
+
+### RC6 verification
+
+- 313 JVM tests pass, including display-only interpolation for sparse multi-point flights and exact comparison with the original worldwide timezone engine at 16 city/border/ocean/dateline coordinates. Lint: 0 errors, 87 warnings.
+- 25 distinct Android checks pass across the targeted runs: the existing 16 checks, four boundary/worker/socket regressions, a moving GLES cadence check, immediate retry after cancellation, actual offline story progress, shared 2D/3D map arrays, and timezone resolution alongside loaded maps with a verified 192 MiB heap limit. The final map-sharing subset passed 10 checks; the subsequent timezone-memory check passed separately in 9.6 seconds. Debug Boston/Niagara creation also completed after the timezone correction.
+- With device Wi-Fi/mobile data off and the test street cache removed, story progress increased on every sample: `0.3000 → 0.3002 → 0.3419 → 0.3536 → 0.3652 → 0.3774`; user pause settled at `0.3804`. Playback is no longer gated by missing tiles.
+- Moving-viewport diagnostic with a fake server delaying each response by 1.2 seconds: 120 frames completed during six slow requests. Software-emulator render+GPU-finish costs: median 19.1 ms, p95 42.7 ms, maximum 626.7 ms; maximum frame-start gap 662.6 ms, including startup. The harness deliberately sleeps 34 ms between draws. These are neither a sustained 30 fps claim nor S23 hardware timings.
+- Generated portrait and landscape MP4s both decoded completely with FFmpeg. Existing audio/no-audio, cancellation, MediaStore/share, local photo analysis and player-rotation tests pass.
+- Test-harness corrections: old shared-Downloads artifacts belonged to an earlier installation and caused EACCES; diagnostic files now use the app-specific external directory. A short synthetic playback finished before the pause assertion, and manually frozen Compose frames made map-toggle display assertions unreliable. The final automated clock test uses a longer route, settles pause and tests offline progress only. Production-APK map switching is checked separately below; the discarded toggle assertion is not counted as a passing check.
+- An emulator System UI ANR appeared at cold boot and was dismissed before UI checks. No app ANR was observed in completed acceptance runs. No physical-phone/thermal benchmark is claimed.
+
+### RC6 packages
+
+Application source: `ab47f1c3059b66ef203e620e3c0b98056a2bdbc6` (subsequent changes are CI scheduling and verification documentation only). The final configuration-only rebuild preserves every DEX byte from the timezone-verified APK.
+
+- `My-Travel-Diary-3D-1.0.0-rc6.apk`: 89,398,287 bytes; SHA-256 `3df782ada1ac83d547da1573c27754be51ae3b03aeb862ef512ec5a7898594bf`.
+- `My-Travel-Diary-3D-1.0.0-rc6-arm64.apk`: 55,885,077 bytes; SHA-256 `4ee9fc6163737e4543a10db76c323c9d77e548ea39e609811e625f683308705f`.
+
+Both APKs report `com.traveler.threed`, version code 7 / `1.0.0-rc6`. Production certificate SHA-256: `4f3995f13853b8b0854c44ca3e15ce2864e32ce273fdb84e0c446059b7004f40`. APK alignment, 64-bit ELF 16 KiB load alignment, ABI contents and packaged JNI/cartography/resource contracts pass.
+
+Signed RC5 (code 6) retained a 31.2 km journey across force-stop/restart; the production-signed RC6 update (code 7) retained and reopened it. Switching 2D to 3D kept the paused 3.5 km position. Creating the 835.5 km Boston/Niagara sample then completed with the 192 MiB heap limit, and both journeys survived another process restart. The final configuration-only APK was installed over that RC6 build and again retained both journeys after restart; its AndroidRuntime error log was empty.
+
+Manual map bounds passed at 1080×2400 / 420 dpi and 2560×1600 / 240 dpi: [phone 2D](verification-3d/rc6-signed-2d-coast.png), [tablet 2D](verification-3d/rc6-signed-2d-tablet.png). The final APK kept both 3D and 2D mode, Play/paused state and exactly 3.8 km while changing between those sizes/densities and 100%/150% font scale. The 3D surface stayed visible: [restored phone](verification-3d/rc6-signed-density-restored.png). An initial DPI comparison was rejected because the first pause tap had not registered; the accepted run explicitly sought to a paused position and verified the Play control before changing configuration. Normal 3D rotation also retained a visible map. These are software-emulator functional checks, not physical-device frame-rate tests.
+
+Historical RC5 buffering behavior below is superseded by RC6.
+
+CI audit: a prior map-only revision passed GitHub validation, but runs `35092295981` and `35098892964` reached their 30/45-minute limits while release R8 optimization and JVM tests were running together, with no assertion/build error reported before cancellation. The workflow now runs tests/debug/lint before release optimization, with one Gradle worker and in-process Kotlin compilation to avoid overlapping those memory-heavy stages. That revised remote workflow must not be described as passed until its run completes; the final signed APK and all acceptance results above were built and checked locally.
 
 ## RC5 adaptive journey update
 
