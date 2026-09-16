@@ -17,9 +17,11 @@ Date: 2026-09-15. Target phone: Galaxy S23 Ultra. The user could not connect the
 - JVM unit tests: 295 passed, 0 failures/errors.
 - Android API 36 emulator: all 17 terrain/cache, 3D, video and Room migration tests passed. Five affected integration cases were rerun after final cache and audio-test changes; all passed.
 - Debug lint: 0 errors, 85 warnings and 5 informational findings (includes existing project warnings).
-- `assembleRelease`: passed with shrinking and production signing; APK 33,647,842 bytes (33.65 MB decimal).
-- Debug compatibility APK: see release asset size/checksum; its certificate matches the shipped 0.1.0-alpha APK.
-- Signed release installation: passed. First-run Timeline import and cold offline playback are being checked before publication.
+- `assembleRelease`: passed with shrinking and production signing; APK 33,910,114 bytes (33.91 MB decimal).
+- Debug compatibility APK: 56,170,384 bytes (56.17 MB decimal); its certificate matches the shipped 0.1.0-alpha APK.
+- Signed release installation and real UI smoke: Timeline JSON import, 46-region automatic terrain download, offline pin, forced process stop, airplane-mode restart, saved-terrain playback, 720p AAC/H.264 export and gallery save all passed. Exported 8.42-second MP4 was decoded completely with FFmpeg (250 video frames, stereo AAC).
+- Release-only import crashes found in zstd JNI field lookup and ESRI class-relative resource lookup were fixed with targeted package preservation. `tools/verify_release_jni.py` inspects the actual packaged DEX/resources and rejects the earlier broken APK; the final APK passes.
+- GitHub CI was still running when this local verification record was finalized; no remote green-check claim is made. Local tests/build and signed-APK smoke are the evidence above.
 
  Tests use synthetic trips and public terrain coordinates, not personal travel history. Emulator timings are not S23 Ultra benchmarks.
 

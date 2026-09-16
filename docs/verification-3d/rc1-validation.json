@@ -1,0 +1,35 @@
+{
+  "version": "1.0.0-rc1",
+  "date": "2026-09-15",
+  "unit_tests": 295,
+  "unit_failures": 0,
+  "android_integration_tests": 17,
+  "affected_case_reruns": 5,
+  "lint": {
+    "errors": 0,
+    "warnings": 85,
+    "information": 5
+  },
+  "device": "API 36 x86_64 emulator, software GLES",
+  "physical_device_tested": false,
+  "release_smoke": [
+    "synthetic Timeline JSON import",
+    "46 public terrain regions downloaded automatically",
+    "offline pin persisted",
+    "airplane mode and Wi-Fi disabled",
+    "process restart and saved 3D playback",
+    "720x1280 H.264 30fps export with 44.1kHz stereo AAC",
+    "gallery save",
+    "full MP4 decode: 8.42s / 250 video frames"
+  ],
+  "assets": {
+    "My-Travel-Diary-3D-1.0.0-rc1-alpha-update.apk": {
+      "bytes": 56170384,
+      "sha256": "6553b5075751553d5721b2c4a04125ba945ef94f2b4cfd4b9b2c792d2fbcb7d8"
+    },
+    "My-Travel-Diary-3D-1.0.0-rc1.apk": {
+      "bytes": 33910114,
+      "sha256": "674fe653a50c5b78b8aef9ec75a08c3fd2e26ba6559506bd204910084690dcb8"
+    }
+  }
+}
