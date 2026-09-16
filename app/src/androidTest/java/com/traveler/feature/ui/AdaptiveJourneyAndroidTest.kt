@@ -39,7 +39,7 @@ class AdaptiveJourneyAndroidTest {
         compose.onNodeWithText("New Travel Story",useUnmergedTree=true).performClick()
         compose.onNodeWithText("Select dates",substring=true).performScrollTo().performClick()
         compose.onNodeWithText("Select travel dates").assertIsDisplayed()
-        device.takeScreenshot(File("/sdcard/Download/rc5-calendar.png"))
+        device.takeScreenshot(File(context.getExternalFilesDir(null),"rc5-calendar.png"))
         compose.onNodeWithText("Use dates").performClick()
         compose.onNodeWithText("Select dates",substring=true).assertExists()
     }
@@ -57,9 +57,9 @@ class AdaptiveJourneyAndroidTest {
             assertEquals("720",retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_HEIGHT))
             val duration=retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)!!.toLong()
             val image=retriever.getFrameAtTime(duration*500,MediaMetadataRetriever.OPTION_CLOSEST)!!
-            File("/sdcard/Download/rc5-landscape-frame.png").outputStream().use { image.compress(Bitmap.CompressFormat.PNG,100,it) }
+            File(context.getExternalFilesDir(null),"rc5-landscape-frame.png").outputStream().use { image.compress(Bitmap.CompressFormat.PNG,100,it) }
             image.recycle()
-            output.copyTo(File("/sdcard/Download/rc5-landscape.mp4"),overwrite=true)
+            output.copyTo(File(context.getExternalFilesDir(null),"rc5-landscape.mp4"),overwrite=true)
         } finally { retriever.release() }
         val raster=Bitmap.createBitmap(256,256,Bitmap.Config.ARGB_8888)
         val drawable=androidx.core.content.ContextCompat.getDrawable(context,com.traveler.R.drawable.demo_niagara)!!
@@ -100,7 +100,7 @@ class AdaptiveJourneyAndroidTest {
                 assertTrue(kotlin.math.abs(player!!.currentPosition-1500)<500)
                 assertTrue("Letterbox keeps video aspect",kotlin.math.abs(player!!.width.toDouble()/player!!.height-1280.0/720)<.05)
             }
-            device.takeScreenshot(File("/sdcard/Download/rc5-player-landscape.png"))
+            device.takeScreenshot(File(context.getExternalFilesDir(null),"rc5-player-landscape.png"))
         } finally { scenario.close() }
         // Keep the produced file in exports so the same in-app player path can be smoke-tested.
         File(context.getExternalFilesDir(null),"rc5-player-path.txt").writeText(output.path)

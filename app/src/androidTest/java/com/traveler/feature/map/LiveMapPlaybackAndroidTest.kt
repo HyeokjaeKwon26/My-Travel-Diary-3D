@@ -30,12 +30,18 @@ class LiveMapPlaybackAndroidTest {
         val prior=prefs.getBoolean("internetMaps",true)
         prefs.edit().putBoolean("internetMaps",true).commit()
         val segment=CanyonDemo.trip().days.flatMap { it.items }.filterIsInstance<TripDayItem.MovementItem>().first().segment
+        val segments=(0 until 16).map { i ->
+            val points=if(i%2==0) segment.simplifiedPoints else segment.simplifiedPoints.reversed()
+            segment.copy(id="offline-loop-$i",startTimestampEpochMs=segment.startTimestampEpochMs+i*3_600_000L,
+                endTimestampEpochMs=segment.startTimestampEpochMs+(i+1)*3_600_000L,
+                startPoint=points.first(),endPoint=points.last(),simplifiedPoints=points)
+        }
         val device=UiDevice.getInstance(InstrumentationRegistry.getInstrumentation())
         compose.mainClock.autoAdvance=false
         try {
             compose.activityRule.scenario.onActivity { it.setContent {
                 MaterialTheme { Column {
-                    TravelMapView(emptyList(),listOf(segment),initialPlaybackProgress=.3f,modifier=Modifier.fillMaxWidth().height(280.dp))
+                    TravelMapView(emptyList(),segments,initialPlaybackProgress=.3f,modifier=Modifier.fillMaxWidth().height(280.dp))
                     androidx.compose.material3.Text("Diary remains below the map",Modifier.fillMaxSize())
                 } }
             } }
@@ -51,6 +57,7 @@ class LiveMapPlaybackAndroidTest {
                 values.add(progress())
             }
             assertTrue("Offline map stopped story: $values",values.zipWithNext().all { (a,b)-> b>a })
+            File(context.getExternalFilesDir(null),"rc6-offline-playback.txt").writeText("progress=$values")
             compose.onNodeWithContentDescription("Pause").performClick()
             val paused=progress()
             compose.onNodeWithText("3D • Terrain").performClick()

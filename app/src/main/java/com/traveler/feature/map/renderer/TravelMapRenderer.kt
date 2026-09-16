@@ -301,7 +301,7 @@ class TravelMapRenderer(
             val prov = seg.geometryProvenance
             val hasDetailedGeometry = seg.simplifiedPoints.size > 2 || seg.rawPoints.isNotEmpty()
 
-            val snappedPath = com.traveler.core.terrain.SharedRouteGeometry.path(seg)
+            val snappedPath = com.traveler.core.terrain.SharedRouteGeometry.displayPath(seg)
             allPoints.addAll(snappedPath)
 
             var totalDist = 0.0
