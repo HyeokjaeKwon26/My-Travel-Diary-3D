@@ -12,7 +12,16 @@ Fullscreen expands the existing map composition in place, hides the diary and to
 - Five distinct Android cases passed across runs: fullscreen expansion/landscape configuration change/Back preserves timeline position and clock, pause survives rotation, playback resumes and advances, plus four existing photo/date/seek overlay regressions. [Live portrait](verification-3d/rc11-fullscreen-portrait.png), [landscape](verification-3d/rc11-fullscreen-landscape.png).
 - A saved 835.5 km / 4-photo journey was opened, closed, reopened, force-stopped and opened again. Its 9,389-byte saved memory file retained the same SHA-256 and modification time throughout, confirming reuse rather than a rewritten selection. Both existing sample journeys and their list sorting survived the debug update.
 - Initial incremental compilation mixed old Kotlin constructor calls with changed model signatures; a full non-incremental compilation resolved these NoSuchMethodError test failures. The first fullscreen Android run passed expansion/position checks but timed out on UiDevice rotation: FULL_SENSOR ignores user-rotation locks. The rerun requested an actual landscape configuration change and passed. An emulator System UI ANR at cold boot was dismissed before acceptance. These failed attempts are not counted as passes.
-- Optimized release/lint/packaging checks pending. Physical S23 Ultra remains unavailable; remote CI is not counted as passed while running.
+- Optimized universal/ARM64 release builds, signing certificate, package/version, resource/JNI contracts, ABI sets, APK ZIP alignment and 64-bit ELF 16 KiB alignment checks passed. Final lint has 0 errors, 89 warnings and 8 informational findings. Physical S23 Ultra remains unavailable; remote CI is not counted as passed while running.
+
+- Final production-signed universal RC11 installed over the existing app without removal. Both 31.2 km / 0-photo and 835.5 km / 4-photo saved journeys and name/ascending sorting remained. The photo journey opened successfully; play/pause/fullscreen and the 0:09 / 0:52 clock were inspected in the optimized release. [Signed fullscreen](verification-3d/rc11-signed-fullscreen.png). Remote GitHub run `35159228201` remained in progress at acceptance and is not counted as passed.
+
+## RC11 packages
+
+Application source: `85635db` (later commits change tests/docs only). Both packages use `com.traveler.threed`, version code 12 / `1.0.0-rc11` and the existing production signing certificate.
+
+- `My-Travel-Diary-3D-1.0.0-rc11.apk`: 89431167 bytes; SHA-256 `11868caf67e9be2f59f3cceb40e00e17d5a1815d3c796718d44f43a4959506b0`.
+- `My-Travel-Diary-3D-1.0.0-rc11-arm64.apk`: 55917957 bytes; SHA-256 `c3868d10a8572c431dd189b14d4798a7a4d59a2ba703e4e1812cd7e56f806c66`.
 
 ---
 
