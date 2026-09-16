@@ -64,7 +64,11 @@ Google Timeline JSON과 휴대폰 사진을 여행 다이어리로 구성하고,
 
 ## Preview
 
-Actual GLES frames: large toy vehicles following a flight and synthetic uphill/downhill routes, plus mapped terrain in the signed app.
+RC4 signed app with north-up street detail (Canyon example route is illustrative, not road matched):
+
+<img src="docs/verification-3d/rc4-signed-street.png" width="320" alt="North-up street map with South Entrance Road and a large animated car" />
+
+Earlier GLES frames: large toy vehicles following a flight and synthetic uphill/downhill routes, plus mapped terrain in the signed app.
 
 <img src="docs/verification-3d/rc3-airplane.png" width="480" alt="Solid aircraft facing its westbound continental route" />
 <img src="docs/verification-3d/rc3-car-climb.png" width="320" alt="Toy car pitching up on a climb" />

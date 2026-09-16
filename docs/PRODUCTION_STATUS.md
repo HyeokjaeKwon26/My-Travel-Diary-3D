@@ -1,6 +1,6 @@
 # 1.0.0-rc4 implementation and acceptance status
 
-Date: 2026-09-15 (local). Target phone: Galaxy S23 Ultra. The user could not connect the phone during this session. This release candidate can be installed and used, but it is not a declaration that every criterion in the production readiness plan has passed.
+Date: 2026-09-16 (local). Target phone: Galaxy S23 Ultra. The user could not connect the phone during this session. This release candidate can be installed and used, but it is not a declaration that every criterion in the production readiness plan has passed.
 
 ## RC4 north-up camera and street detail
 
@@ -12,7 +12,14 @@ Exports read already cached tiles only and never initiate street-map downloads. 
 
 ### RC4 verification
 
-Final validation results are recorded below before publication. Automated map tests use local synthetic tile fixtures or a fake HTTP connection; they do not download from the public tile service. A manual app viewport confirmed that actual OSM roads and place names render over the Canyon terrain.
+- 302 JVM tests passed. Debug and optimized release builds passed. Lint: 0 errors, 86 warnings and 6 informational findings (the added warning suggests using the SharedPreferences KTX helper).
+- Production APK: 43,817,765 bytes; SHA-256 `d93554a12fe9563604006eada1ec8f1c4faf8da11881a326d848cbf39ec8af46`. Version code 5, same production certificate as RC1/RC2/RC3. Packaged JNI/resource/map contracts passed.
+- Automated map tests use local synthetic tile fixtures or a fake HTTP connection; they do not download from the public tile service. A manual app viewport confirmed that actual OSM roads and place names render over the Canyon terrain.
+- The first full-screen smoke test used a regional-view color-count threshold that rejected the new closer rural view. Its saved image showed rendered terrain and the toy car. The check now requires terrain color variation plus red/yellow toy pixels instead of an arbitrary large palette; obscuring system dialogs still fail the test.
+- All nine Android checks passed: three street-map/cache checks, two reference-cartography checks, three app/persistence/video checks, and 33 vehicle poses within the all-mode check. Heading reversal and the old arrival zoom leave map pixels unchanged outside the vehicle. The final generated MP4 decoded completely with FFmpeg.
+- Installed production-signed RC4 over RC3 without uninstalling in the same emulator session. The saved 31.2 km Canyon journey survived force-stop/restart before the update, stayed in the home list after the update, reopened with visits/movement, and displayed live street detail. The installed package reported version code 5 / 1.0.0-rc4.
+- Subsequent small changes collapse the loaded-map credit/status to one line and record the tile revision before texture composition, so a tile arriving during upload is not accidentally marked as already painted. Functional tests above precede these two finishing changes; the final signed APK was reinstalled, reopened the retained journey after emulator restart, and showed a complete street map while paused with the compact credit. [Final signed screenshot](verification-3d/rc4-signed-street.png).
+- As with RC3, an external System UI non-response dialog appeared at emulator cold boot and was dismissed before tests. The clean final tests passed; no S23 Ultra hardware/thermal benchmark is claimed.
 
 ## RC3 playful vehicles and flight correction
 
