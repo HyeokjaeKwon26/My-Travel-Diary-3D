@@ -9,7 +9,7 @@
 
 ## Updating an earlier 3D release
 
-Install either compatible RC10 APK directly over an earlier production 3D version. The application ID and signing key are unchanged and the version code increases to 11. Keep the installed app: uninstalling is unnecessary and would remove its local data. Existing journeys and terrain remain available.
+Install either compatible RC11 APK directly over an earlier production 3D version. The application ID and signing key are unchanged and the version code increases to 12. Keep the installed app: uninstalling is unnecessary and would remove its local data. Existing journeys and terrain remain available.
 
 The earlier 3D alpha had no installations or users; no alpha migration procedure is needed.
 

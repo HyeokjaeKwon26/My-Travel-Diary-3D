@@ -6,7 +6,13 @@ All three story profiles persist their raw selected moments before scheduling. L
 
 Fullscreen expands the existing map composition in place, hides the diary and top app bar, and permits sensor-driven portrait/landscape rotation. Fullscreen exit and Android Back return to the diary without resetting the playback position. System bars and orientation policy are restored on exit. The playback bar shows current story time / total story time, including photo holds and title/end durations. Speed changes affect advancement, not the displayed timeline length; exports using a different duration profile have their own length.
 
-Verification pending final build and emulator run.
+## RC11 verification
+
+- 337 JVM tests passed with zero failures/errors/skips. New tests cover durable selections after store recreation, cached failed-analysis outcomes, all three playback profiles, incremental analysis of added sources, removed sources, representative overrides, explicit refresh, cancellation preserving the old file, deletion and elapsed/total clock formatting.
+- Five distinct Android cases passed across runs: fullscreen expansion/landscape configuration change/Back preserves timeline position and clock, pause survives rotation, playback resumes and advances, plus four existing photo/date/seek overlay regressions. [Live portrait](verification-3d/rc11-fullscreen-portrait.png), [landscape](verification-3d/rc11-fullscreen-landscape.png).
+- A saved 835.5 km / 4-photo journey was opened, closed, reopened, force-stopped and opened again. Its 9,389-byte saved memory file retained the same SHA-256 and modification time throughout, confirming reuse rather than a rewritten selection. Both existing sample journeys and their list sorting survived the debug update.
+- Initial incremental compilation mixed old Kotlin constructor calls with changed model signatures; a full non-incremental compilation resolved these NoSuchMethodError test failures. The first fullscreen Android run passed expansion/position checks but timed out on UiDevice rotation: FULL_SENSOR ignores user-rotation locks. The rerun requested an actual landscape configuration change and passed. An emulator System UI ANR at cold boot was dismissed before acceptance. These failed attempts are not counted as passes.
+- Optimized release/lint/packaging checks pending. Physical S23 Ultra remains unavailable; remote CI is not counted as passed while running.
 
 ---
 

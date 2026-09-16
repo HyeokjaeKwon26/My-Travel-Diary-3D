@@ -59,10 +59,11 @@ class FullscreenPlaybackAndroidTest {
             assertEquals(label,clock())
             val expanded=compose.onNodeWithTag("playback-seek").fetchSemanticsNode().boundsInWindow
             assertTrue("Map did not expand",expanded.bottom>compactBounds.bottom+100)
-            Thread.sleep(1000)
+            Thread.sleep(1000);compose.mainClock.advanceTimeBy(200)
             device.takeScreenshot(File(context.getExternalFilesDir(null),"rc11-fullscreen-portrait.png"))
-            device.setOrientationLeft()
-            compose.waitUntil(15_000) { device.displayWidth>device.displayHeight }
+            // FULL_SENSOR intentionally ignores UiDevice user-rotation locks. Request a real configuration change.
+            compose.activityRule.scenario.onActivity { it.requestedOrientation=android.content.pm.ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE }
+            compose.waitUntil(15_000) { compose.mainClock.advanceTimeBy(32); device.displayWidth>device.displayHeight }
             compose.mainClock.advanceTimeBy(500)
             assertEquals(before,progress(),.00001f)
             assertEquals(label,clock())
@@ -71,7 +72,7 @@ class FullscreenPlaybackAndroidTest {
             assertTrue(progress()>before)
             compose.onNodeWithContentDescription("Pause").performClick()
             compose.mainClock.advanceTimeBy(32)
-            Thread.sleep(1000)
+            Thread.sleep(1000);compose.mainClock.advanceTimeBy(200)
             device.takeScreenshot(File(context.getExternalFilesDir(null),"rc11-fullscreen-landscape.png"))
             val paused=progress()
             compose.activityRule.scenario.onActivity { it.onBackPressedDispatcher.onBackPressed() }
