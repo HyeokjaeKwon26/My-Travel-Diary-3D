@@ -18,7 +18,25 @@ This project keeps the original Git history and uses a separate repository and A
 
 ## Verification
 
-Final verification results are recorded below after the local test run completes. The test device is an Android 16 / API 36 `medium_phone` emulator using software graphics. Its timings must not be presented as ordinary-phone performance.
+Local results:
+
+| Check | Result |
+| --- | --- |
+| JVM unit tests | 286 passed, 0 failures/errors |
+| Room migration tests | 6 passed, including 5 → 6 |
+| MP4/audio/gallery/cancellation/share tests | 5 passed |
+| 3D render/export, altitude persistence, normal-app navigation | 3 passed |
+| Embedded-map regression after removing the Compose clipping layer | Passed; asserts a non-uniform actual GPU screenshot, not only UI controls |
+| Debug APK build | Passed; separate application ID `com.traveler.threed` |
+| Android lint | 0 errors, 81 warnings, 3 informational findings |
+
+The emulator checks were run in targeted groups, with affected tests rerun after fixes. An initial JUnit return-type issue and a semantics locator issue were corrected before the passing runs. Screenshot inspection also caught a blank embedded SurfaceView caused by the old Compose clipping layer; the dedicated visual regression passed after removing that layer.
+
+The test device is an Android 16 / API 36 `medium_phone` emulator using software graphics. These runs do not establish ordinary-phone performance. GPU frame and decoded MP4 images were inspected directly. The two capture images use different playback timestamps/aspect ratios; they are not a pixel-identical comparison.
+
+Artifacts: [normal app](verification-3d/canyon-3d-app.png), [GPU playback frame](verification-3d/canyon-3d.png), [decoded video frame](verification-3d/canyon-3d-video-frame.png).
+
+GitHub Actions performs fresh unit tests, APK build and lint on pushes; see the repository Actions tab for the status of each commit.
 
 ## Remaining work and known limits
 

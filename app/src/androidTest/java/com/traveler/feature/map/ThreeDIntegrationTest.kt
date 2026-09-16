@@ -46,7 +46,16 @@ class ThreeDIntegrationTest {
         compose.onNodeWithContentDescription("Start Playback").assertExists()
         val screenshot=File(context.getExternalFilesDir(null),"canyon-3d-app.png")
         val device=UiDevice.getInstance(InstrumentationRegistry.getInstrumentation())
-        device.takeScreenshot(screenshot)
+        compose.waitUntil(30_000) {
+            device.takeScreenshot(screenshot)
+            val bitmap=android.graphics.BitmapFactory.decodeFile(screenshot.path)
+            val colors=buildSet {
+                for(y in bitmap.height/6 until bitmap.height/3 step 20)
+                    for(x in bitmap.width/4 until bitmap.width*3/4 step 20) add(bitmap.getPixel(x,y))
+            }
+            bitmap.recycle()
+            colors.size>12
+        }
         device.executeShellCommand("cp ${screenshot.path} /sdcard/Download/canyon-3d-app.png")
     }
 

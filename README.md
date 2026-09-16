@@ -50,6 +50,7 @@ Google Timeline JSON과 휴대폰 사진을 여행 다이어리로 구성하고,
 
 Actual emulator GLES frame (illustrative path over real terrain):
 
+<img src="docs/verification-3d/canyon-3d-app.png" width="320" alt="3D terrain embedded in the travel diary" />
 <img src="docs/verification-3d/canyon-3d.png" width="320" alt="3D vehicle following a route across simplified Grand Canyon terrain" />
 
 ## Build and validation

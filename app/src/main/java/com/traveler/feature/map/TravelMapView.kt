@@ -187,9 +187,9 @@ fun TravelMapView(
     val isPlaybackActive = isPlaying || playbackProgress > 0f
 
     Box(
+        // SurfaceView must punch through the window directly. An offscreen Compose
+        // clipping layer covers its separate GPU surface on some Android versions.
         modifier = modifier
-            .background(Color(0xFFF1F5F9))
-            .clip(RoundedCornerShape(12.dp))
     ) {
         com.traveler.feature.map.threed.Map3DLayer(renderModel, storyTimeline, currentActiveState) {
     LaunchedEffect(Unit) {
