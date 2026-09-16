@@ -2,7 +2,7 @@
 
 An independent Android 3D edition of [My Travel Diary](https://github.com/HyeokjaeKwon26/My-Travel-Diary), based on original commit `9bcfb4f`.
 
-**Version: 1.0.0-rc1.** Automatic terrain preparation, offline cache, and signed installation builds. Physical-device acceptance is pending; Galaxy S23 Ultra is the primary target. See [validation and remaining work](docs/PRODUCTION_STATUS.md).
+**Version: 1.0.0-rc2.** Offline cartography draped over 3D terrain, automatic elevation preparation, and signed installation builds. Physical-device acceptance is pending; Galaxy S23 Ultra is the primary target. See [validation and remaining work](docs/PRODUCTION_STATUS.md).
 
 ## 한국어
 
@@ -15,6 +15,8 @@ Google Timeline JSON과 휴대폰 사진을 여행 다이어리로 구성하고,
 
 ### 이번 버전
 
+- 갈색 지형이 지도를 가리던 문제 수정: 지형 위에 해안선·강·주요 도로·도시 영역·지명을 표시. 지도 좌우 반전도 수정.
+- 기본 지도는 APK에 포함되어 고도 다운로드 전이나 오프라인에서도 표시됩니다. 모든 골목길을 포함한 내비게이션 지도는 아닙니다.
 - OpenGL ES 2.0 지구본, 지역 지형, 간단한 자동차/비행기와 추적 카메라.
 - 실제 공개 고도 데이터로 만든 **Grand Canyon South Rim** 오프라인 지형 팩.
 - 지상 이동 경로 주변 지형 자동 다운로드, 일시정지·재개, 모바일 데이터 선택.
@@ -53,10 +55,10 @@ Google Timeline JSON과 휴대폰 사진을 여행 다이어리로 구성하고,
 
 ## Preview
 
-Actual emulator GLES frame (illustrative path over real terrain):
+Actual GLES frames: offline reference map over synthetic flat elevation, and an illustrative route over real Grand Canyon elevation.
 
-<img src="docs/verification-3d/canyon-3d-app.png" width="320" alt="3D terrain embedded in the travel diary" />
-<img src="docs/verification-3d/canyon-3d.png" width="320" alt="3D vehicle following a route across simplified Grand Canyon terrain" />
+<img src="docs/verification-3d/rc2-san-francisco.png" width="480" alt="Offline roads, land, water and labels on the 3D surface" />
+<img src="docs/verification-3d/rc2-canyon-video.png" width="320" alt="Video frame showing river and road cartography over Grand Canyon relief" />
 
 ## Build and validation
 

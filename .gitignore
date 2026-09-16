@@ -38,6 +38,7 @@ captures/
 
 # Kotlin compilation cache
 .kotlin/
+__pycache__/
 
 # Test runner output
 verification/unit-tests/

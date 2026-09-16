@@ -1,6 +1,14 @@
 # Traveler - 오프라인 벡터 베이스맵 출처 및 생성 사양 (Basemap Sources & Specification)
 
-본 문서는 Traveler 애플리케이션에 내장된 오프라인 벡터 베이스맵(`app/src/main/assets/basemap_world.json`)의 원천 데이터셋, 라이선스, SHA-256 체크섬 및 생성 파이프라인을 기술합니다.
+본 문서는 Traveler 애플리케이션에 내장된 오프라인 벡터 베이스맵의 원천 데이터셋, 라이선스, SHA-256 체크섬 및 생성 파이프라인을 기술합니다.
+
+## 3D 지도 표면 (1.0.0-rc2)
+
+`tools/build_3d_cartography.py`는 기존 1:10m 지역 지도와 Natural Earth 도로·강·도시 영역을 함께 변환합니다. 원천은 `nvkelso/natural-earth-vector`의 고정 커밋이며 URL과 SHA-256은 [cartography-sources.json](verification-3d/cartography-sources.json)에 기록합니다. 라이선스는 [Natural Earth public domain](https://www.naturalearthdata.com/about/terms-of-use/)입니다.
+
+생성물 `app/src/main/assets/basemap_3d.bin.gz`는 미리 투영한 좌표를 저장합니다. AAPT가 gzip을 풀어 APK에는 `assets/basemap_3d.bin`으로 패키징합니다. 앱은 이를 한 번 읽어 메모리에 보관하고, 화면 주변만 최대 2048×2048 텍스처 한 장으로 그립니다. 같은 지도가 3D 지형과 영상에 적용되며 휴대폰에서 별도로 지도 파일을 다운로드하지 않습니다.
+
+자료는 지역 단위 참고 지도이며 모든 골목길이나 최신 도로를 담지 않습니다. 경로를 도로에 맞추는 기능도 아닙니다. 기존 고도 다운로드와 지도 표시는 독립적입니다.
 
 ---
 

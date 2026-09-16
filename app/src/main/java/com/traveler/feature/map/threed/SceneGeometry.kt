@@ -25,11 +25,12 @@ object EarthGeometry {
     fun position(p: GeoPoint, altitude: Double = 0.0): Vec3 {
         val lat = Math.toRadians(p.latitude); val lng = Math.toRadians(p.longitude)
         val r = 1.0 + altitude / R
-        return Vec3(cos(lat)*cos(lng)*r, sin(lat)*r, cos(lat)*sin(lng)*r)
+        // East must point right when north is screen-up in a right-handed GLES view.
+        return Vec3(cos(lat)*cos(lng)*r, sin(lat)*r, -cos(lat)*sin(lng)*r)
     }
     fun north(p: GeoPoint): Vec3 {
         val a = Math.toRadians(p.latitude); val b = Math.toRadians(p.longitude)
-        return Vec3(-sin(a)*cos(b),cos(a),-sin(a)*sin(b))
+        return Vec3(-sin(a)*cos(b),cos(a),sin(a)*sin(b))
     }
     fun forward(p: GeoPoint, heading: Double): Vec3 {
         val n = north(p); val e = n.cross(position(p).unit())

@@ -113,6 +113,7 @@ fun Map3DLayer(model:TravelMapRenderModel,timeline:TravelStoryTimeline,state:Tra
             Text("Terrain: Mapzen / USGS and regional contributors. Tile requests reveal the requested area and IP to the provider; photos and Timeline files are never uploaded.",fontSize=11.sp)
             TextButton(onClick={credits=true}) { Text("Terrain data sources & credits") }
             Text("Outside stored regions the globe has no detailed relief. Terrain height is estimated, not measured vehicle altitude.",fontSize=11.sp)
+            Text("Offline map: Natural Earth. Regional roads, rivers and place names are included; this is not a street-level navigation map.",fontSize=11.sp)
             message?.let { Text(it,fontSize=11.sp) }
         }
     },confirmButton={TextButton(onClick={options=false}) { Text("Done") }})
