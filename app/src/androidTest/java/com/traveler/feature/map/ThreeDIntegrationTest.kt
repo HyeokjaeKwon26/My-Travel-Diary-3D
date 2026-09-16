@@ -30,6 +30,15 @@ import androidx.compose.ui.Modifier
 class ThreeDIntegrationTest {
     @get:Rule val compose = createAndroidComposeRule<MainActivity>()
     private val context get() = InstrumentationRegistry.getInstrumentation().targetContext
+    private var previousInternetMaps=true
+    @Before fun disableLiveMapRequests() {
+        val prefs=context.getSharedPreferences("scene_preferences",0)
+        previousInternetMaps=prefs.getBoolean("internetMaps",true)
+        prefs.edit().putBoolean("internetMaps",false).commit()
+    }
+    @After fun restoreMapPreference() {
+        context.getSharedPreferences("scene_preferences",0).edit().putBoolean("internetMaps",previousInternetMaps).commit()
+    }
     private fun model(trip:Trip):TravelMapRenderModel {
         val items=trip.days.flatMap { it.items }
         return TravelMapRenderModel(items.filterIsInstance<TripDayItem.VisitItem>().map { it.visit },
@@ -69,7 +78,7 @@ class ThreeDIntegrationTest {
         val scene=SceneGeometry(model,timeline,packs)
         val errors=java.util.concurrent.CopyOnWriteArrayList<String>()
         compose.activityRule.scenario.onActivity { activity -> activity.setContent {
-            Travel3DSurface(scene,timeline.evaluate(.45f),false,Modifier.fillMaxSize()) { errors.add(it) }
+            Travel3DSurface(scene,timeline.evaluate(.45f),true,Modifier.fillMaxSize(),internetMaps=false) { errors.add(it) }
         }
         }
         compose.waitForIdle()
@@ -80,12 +89,18 @@ class ThreeDIntegrationTest {
         compose.waitUntil(30_000) {
             device.takeScreenshot(screenshot)
             val bitmap=android.graphics.BitmapFactory.decodeFile(screenshot.path)
+            var toyPixels=0
             val colors=if(bitmap==null) emptySet() else buildSet {
                 for(y in bitmap.height/4 until bitmap.height*3/4 step 30)
-                    for(x in bitmap.width/4 until bitmap.width*3/4 step 30) add(bitmap.getPixel(x,y))
+                    for(x in bitmap.width/4 until bitmap.width*3/4 step 30) {
+                        val pixel=bitmap.getPixel(x,y);add(pixel)
+                        if(android.graphics.Color.red(pixel)>200 && android.graphics.Color.blue(pixel)<80) toyPixels++
+                    }
                 bitmap.recycle()
             }
-            colors.size>30 || errors.isNotEmpty()
+            // A close rural view has fewer map colors than the old regional view.
+            // Require both terrain variation and the rendered red/yellow vehicle.
+            (colors.size>6 && toyPixels>3) || errors.isNotEmpty()
         }
         assertTrue(errors.joinToString(),errors.isEmpty())
         assertFalse("A system/app non-response dialog obscures the screenshot",

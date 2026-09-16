@@ -16,12 +16,17 @@ import java.nio.FloatBuffer
 import kotlin.math.*
 
 /** The same renderer runs on GLSurfaceView and the video encoder EGL surface. */
-class TravelGlRenderer(private val context: Context, val scene: SceneGeometry) {
+class TravelGlRenderer(private val context: Context, val scene: SceneGeometry,
+                       val streets:StreetMapSession=StreetMapSession(context)) {
     private var program = 0
     private var texture = 0
     private var mapTexture = 0
     private lateinit var mapDrape: OfflineMapDrape
     private var mapWindow: OfflineMapDrape.Window? = null
+    private var referenceRaster:android.graphics.Bitmap?=null
+    private var mapRevision=-1L
+    private var lastMapUpload=0L
+    private var paintedTiles=emptyList<StreetTile>()
     private var localBase: Mesh? = null
     private var mapBoundsUniform = 0
     private var mapTextureUniform = 0
@@ -109,25 +114,24 @@ class TravelGlRenderer(private val context: Context, val scene: SceneGeometry) {
         }
     }
 
-    fun render(width: Int,height: Int,state: TravelPlaybackState?, calm: Boolean=false) {
+    fun render(width: Int,height: Int,state: TravelPlaybackState?, calm: Boolean=true,mapScale:Double=1.0) {
         check(program!=0)
         GL.glViewport(0,0,width,height); GL.glClearColor(.025f,.055f,.09f,1f)
         GL.glClear(GL.GL_COLOR_BUFFER_BIT or GL.GL_DEPTH_BUFFER_BIT)
         GL.glEnable(GL.GL_DEPTH_TEST); GL.glDepthFunc(GL.GL_LEQUAL)
         GL.glEnable(GL.GL_BLEND); GL.glBlendFunc(GL.GL_SRC_ALPHA,GL.GL_ONE_MINUS_SRC_ALPHA)
         val routeIndex=scene.routes.indexOfFirst { it.episodeIndex==state?.episodeIndex && it.id==state.currentSegment?.id }
-        val flight=state?.currentTransportMode==TransportMode.AIRPLANE
         val motion=state?.let { scene.motion(it) }
         val focus=motion?.position ?: scene.overviewCenter
         val up=focus.unit()
         val centerPoint=GeoPoint(Math.toDegrees(asin(up.y)),Math.toDegrees(atan2(-up.z,up.x)))
         // North-up changes only the camera, never the vehicle's route heading.
         val forward=if(calm || motion==null) EarthGeometry.north(centerPoint) else motion.forward
-        val distance=if(state==null) scene.overviewDistance else if(flight)
-            (state.cameraSpanLat*111000/EarthGeometry.R*1.3).coerceIn(.04,2.8) else
-            (state.cameraSpanLat*111000/EarthGeometry.R).coerceIn(.0008,.006)
+        val distance=if(state==null) scene.overviewDistance else
+            NorthUpCamera.distance(state.currentTransportMode,state.cameraSpanLat)*mapScale.coerceIn(.5,6.0)
         val cameraRight=forward.cross(up).unit()
-        var eye=focus+up*(distance*.65)-forward*(distance*.75)+cameraRight*(if(calm || state==null)0.0 else distance*.5)
+        var eye=if(calm) focus+up*(distance*.94)-forward*(distance*.34)
+            else focus+up*(distance*.65)-forward*(distance*.75)+cameraRight*(if(state==null)0.0 else distance*.5)
         if(distance<.1) {
             val radial=eye.unit()
             val eyePoint=GeoPoint(Math.toDegrees(asin(radial.y)),Math.toDegrees(atan2(-radial.z,radial.x)))
@@ -141,10 +145,10 @@ class TravelGlRenderer(private val context: Context, val scene: SceneGeometry) {
         GL.glUseProgram(program); GL.glUniformMatrix4fv(matrixUniform,1,false,matrix,0)
         GL.glActiveTexture(GL.GL_TEXTURE0); GL.glBindTexture(GL.GL_TEXTURE_2D,texture); GL.glUniform1i(textureUniform,0)
         world?.let { draw(it,GL.GL_TRIANGLES,1f,1) }
+        val center=GeoPoint(Math.toDegrees(asin(up.y)),Math.toDegrees(atan2(-up.z,up.x)))
+        updateMap(center,distance,width,height)
+        localBase?.let { draw(it,GL.GL_TRIANGLES,1f,2) }
         if(distance<.1) {
-            val center=GeoPoint(Math.toDegrees(asin(up.y)),Math.toDegrees(atan2(-up.z,up.x)))
-            updateMap(center,distance,width.toDouble()/max(1,height))
-            localBase?.let { draw(it,GL.GL_TRIANGLES,1f,2) }
             val nearby=scene.packs.indices.sortedBy { i ->
                 val p=scene.packs[i]
                 com.traveler.core.common.geo.GeodesicUtils.distanceMeters(center,
@@ -222,13 +226,13 @@ class TravelGlRenderer(private val context: Context, val scene: SceneGeometry) {
             return mesh(values)
     }
 
-    private fun updateMap(center:GeoPoint,distance:Double,aspect:Double) {
-        val wanted=mapDrape.window(center.latitude,center.longitude,distance,aspect)
+    private fun updateMap(center:GeoPoint,distance:Double,width:Int,height:Int) {
+        val wanted=mapDrape.window(center.latitude,center.longitude,distance,width.toDouble()/max(1,height))
         val p=WebMercator.project(center)
         GL.glActiveTexture(GL.GL_TEXTURE1);GL.glBindTexture(GL.GL_TEXTURE_2D,mapTexture)
-        if(mapWindow?.containsCenter(p.x,p.y,wanted.span)!=true) {
-            val bitmap=mapDrape.rasterize(wanted)
-            try { GLUtils.texImage2D(GL.GL_TEXTURE_2D,0,bitmap,0) } finally { bitmap.recycle() }
+        val moved=mapWindow?.containsCenter(p.x,p.y,wanted.span)!=true
+        if(moved) {
+            referenceRaster?.recycle();referenceRaster=mapDrape.rasterize(wanted)
             mapWindow=wanted
             // A finely tessellated base stays visible even with no downloaded DEM.
             // The coarse globe's triangles can sit kilometres below the local surface.
@@ -236,7 +240,7 @@ class TravelGlRenderer(private val context: Context, val scene: SceneGeometry) {
             fun add(r:Int,c:Int) {
                 val x=wanted.x+wanted.span*c/64;val y=(wanted.y+wanted.span*r/64).coerceIn(0.0,1.0)
                 val geo=WebMercator.unproject(WorldPoint(x-floor(x),y))
-                vertex(values,EarthGeometry.position(geo,-500.0),floatArrayOf(1f,1f,1f,1f),
+                vertex(values,EarthGeometry.position(geo,-2.0),floatArrayOf(1f,1f,1f,1f),
                     (x-floor(x)).toFloat(),y.toFloat())
             }
             for(r in 0 until 64) for(c in 0 until 64) {
@@ -245,9 +249,47 @@ class TravelGlRenderer(private val context: Context, val scene: SceneGeometry) {
             localBase=mesh(values)
         }
         val w=mapWindow!!
+        val footprint=visibleFootprint(w,1+scene.surface(center)/EarthGeometry.R)
+        val plan=StreetTilePlan.visible(footprint,width,height)
+        streets.request(plan)
+        val now=android.os.SystemClock.uptimeMillis()
+        if(moved || ((mapRevision!=streets.version || paintedTiles!=plan.tiles) && now-lastMapUpload>=600)) {
+            val bitmap=referenceRaster!!.copy(android.graphics.Bitmap.Config.ARGB_8888,true)
+            streets.paint(android.graphics.Canvas(bitmap),w,bitmap.width,plan)
+            try { GLUtils.texImage2D(GL.GL_TEXTURE_2D,0,bitmap,0) } finally { bitmap.recycle() }
+            mapRevision=streets.version;paintedTiles=plan.tiles;lastMapUpload=now
+        }
         GL.glUniform4f(mapBoundsUniform,w.x.toFloat(),w.y.toFloat(),(1/w.span).toFloat(),0f)
         GL.glUniform1i(mapTextureUniform,1)
         GL.glActiveTexture(GL.GL_TEXTURE0)
+    }
+
+    /** Ray/sphere intersections bound only the geography currently on screen. */
+    private fun visibleFootprint(w:OfflineMapDrape.Window,radius:Double):MapFootprint {
+        val inverse=FloatArray(16)
+        if(!Matrix.invertM(inverse,0,matrix,0)) return MapFootprint(w.x,w.y,w.x+w.span,w.y+w.span)
+        val points=mutableListOf<WorldPoint>()
+        for(x in listOf(-1f,0f,1f)) for(y in listOf(-1f,0f,1f)) {
+            fun unproject(z:Float):Vec3 {
+                val result=FloatArray(4);Matrix.multiplyMV(result,0,inverse,0,floatArrayOf(x,y,z,1f),0)
+                return Vec3((result[0]/result[3]).toDouble(),(result[1]/result[3]).toDouble(),(result[2]/result[3]).toDouble())
+            }
+            val origin=unproject(-1f);val direction=(unproject(1f)-origin).unit()
+            val b=origin.dot(direction);val c=origin.dot(origin)-radius*radius
+            val discriminant=b*b-c
+            if(discriminant<0) continue
+            val t=-b-sqrt(discriminant)
+            if(t<0) continue
+            val hit=(origin+direction*t).unit()
+            val geo=WebMercator.project(Math.toDegrees(asin(hit.y.coerceIn(-1.0,1.0))),Math.toDegrees(atan2(-hit.z,hit.x)))
+            val wx=geo.x+round(w.x+w.span/2-geo.x)
+            points.add(WorldPoint(wx,geo.y))
+        }
+        if(points.isEmpty()) return MapFootprint(w.x,w.y,w.x+w.span,w.y+w.span)
+        val left=max(w.x,points.minOf { it.x });val right=min(w.x+w.span,points.maxOf { it.x })
+        val top=max(w.y,points.minOf { it.y });val bottom=min(w.y+w.span,points.maxOf { it.y })
+        return if(right>left && bottom>top) MapFootprint(left,top,right,bottom)
+            else MapFootprint(w.x,w.y,w.x+w.span,w.y+w.span)
     }
 
     private fun draw(m:Mesh,mode:Int,alpha:Float=1f,textured:Int=0) {
@@ -280,5 +322,5 @@ class TravelGlRenderer(private val context: Context, val scene: SceneGeometry) {
         val status=IntArray(1);GL.glGetShaderiv(id,GL.GL_COMPILE_STATUS,status,0)
         check(status[0]!=0) { GL.glGetShaderInfoLog(id) };return id
     }
-    fun release() { terrain.clear();routes=emptyList();world=null;localBase=null;mapWindow=null;if(program!=0) GL.glDeleteProgram(program);GL.glDeleteTextures(2,intArrayOf(texture,mapTexture),0);program=0;texture=0;mapTexture=0 }
+    fun release() { streets.close();referenceRaster?.recycle();referenceRaster=null;terrain.clear();routes=emptyList();world=null;localBase=null;mapWindow=null;if(program!=0) GL.glDeleteProgram(program);GL.glDeleteTextures(2,intArrayOf(texture,mapTexture),0);program=0;texture=0;mapTexture=0 }
 }

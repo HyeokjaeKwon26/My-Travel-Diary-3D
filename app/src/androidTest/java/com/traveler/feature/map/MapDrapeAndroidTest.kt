@@ -75,10 +75,10 @@ class MapDrapeAndroidTest {
                 center.latitude-.3,center.longitude-.4,center.longitude+.4,65,65,List(65*65){100.0})
             val model=TravelMapRenderModel(emptyList(),emptyList(),focusedLocation=center)
             val scene=SceneGeometry(model,TravelStoryTimeline.build(model),if(terrain) listOf(pack) else emptyList())
-            renderer=TravelGlRenderer(context,scene);renderer.initialize()
+            renderer=TravelGlRenderer(context,scene,StreetMapSession(context,cacheDirectory=File(context.cacheDir,"map-reference-test")));renderer.initialize()
             val state=TravelPlaybackState(0f,0,center,TransportMode.CAR,0f,
                 cameraCenter=center,cameraSpanLat=.08,cameraSpanLng=.1)
-            renderer.render(width,height,state)
+            renderer.render(width,height,state,mapScale=6.0)
             assertEquals("GLES error",GLES20.GL_NO_ERROR,GLES20.glGetError())
             val bytes=ByteBuffer.allocateDirect(width*height*4)
             GLES20.glReadPixels(0,0,width,height,GLES20.GL_RGBA,GLES20.GL_UNSIGNED_BYTE,bytes)

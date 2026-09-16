@@ -43,14 +43,15 @@ class TravelVideoRenderer(
         }
     }
     private var glRenderer: com.traveler.feature.map.threed.TravelGlRenderer? = null
-    private val calmCamera = context.getSharedPreferences("scene_preferences", 0).getBoolean("calm", false)
+    private val calmCamera = true
+    private val mapScale=context.getSharedPreferences("scene_preferences",0).getFloat("mapScale",1f).toDouble()
 
     fun renderGlFrame(surface: CodecInputSurface, bitmap: Bitmap, canvas: Canvas, width: Int, height: Int,
                       storySeconds: Float, ptsNs: Long) {
         surface.makeCurrent()
         val gl = glRenderer ?: com.traveler.feature.map.threed.TravelGlRenderer(context, sceneGeometry)
             .also { it.initialize(); glRenderer = it }
-        gl.render(width, height, timeline.evaluateAtStoryTime(storySeconds), calmCamera)
+        gl.render(width, height, timeline.evaluateAtStoryTime(storySeconds), calmCamera,mapScale)
         canvas.drawColor(Color.TRANSPARENT, PorterDuff.Mode.CLEAR)
         renderFrame(canvas, width, height, storySeconds, renderMap = false)
         surface.drawFrame(bitmap, ptsNs, clear = false)
@@ -140,6 +141,12 @@ class TravelVideoRenderer(
             val alpha = (elapsedEnd / 0.5f).coerceIn(0f, 1f)
             renderEndCardOverlay(canvas, width, height, endCard, alpha)
         }
+        val credit=Paint(Paint.ANTI_ALIAS_FLAG).apply { color=Color.WHITE;textSize=width*.020f;typeface=Typeface.DEFAULT }
+        val label="© OpenStreetMap contributors · Natural Earth"
+        val textWidth=credit.measureText(label)
+        canvas.drawRect(width*.025f,height-width*.063f,width*.045f+textWidth,height-width*.017f,cardBackgroundPaint)
+        canvas.drawText(label,width*.035f,height-width*.031f,credit)
+
     }
 
     private fun renderPhotoOverlay(
