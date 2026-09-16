@@ -7,6 +7,7 @@ import com.traveler.R
 import com.traveler.feature.map.story.TravelStoryTimeline
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.ensureActive
 import java.io.ByteArrayOutputStream
 import java.io.File
 import java.nio.ByteBuffer
@@ -92,21 +93,18 @@ class TravelVideoEncoder(
             // 2. Configure Audio Encoder (AAC) if includeMusic is true
             var pcmRawBytes: ByteArray? = null
             if (includeMusic) {
-                try {
-                    val rawStream = context.resources.openRawResource(R.raw.traveler_memories)
-                    val buffer = ByteArrayOutputStream()
-                    val temp = ByteArray(8192)
-                    var read: Int
-                    while (rawStream.read(temp).also { read = it } != -1) {
-                        buffer.write(temp, 0, read)
-                    }
-                    rawStream.close()
-                    val fullWav = buffer.toByteArray()
-                    if (fullWav.size > 44) {
-                        pcmRawBytes = fullWav.copyOfRange(44, fullWav.size)
-                    }
-                } catch (_: Exception) {
-                    pcmRawBytes = null
+                pcmRawBytes = context.resources.openRawResource(R.raw.traveler_memories).use { raw ->
+                    val input = java.io.DataInputStream(raw)
+                    val header = ByteArray(44)
+                    input.readFully(header)
+                    check(String(header, 0, 4, Charsets.US_ASCII) == "RIFF" &&
+                        String(header, 36, 4, Charsets.US_ASCII) == "data") { "Unsupported bundled WAV header" }
+                    val fields = ByteBuffer.wrap(header).order(ByteOrder.LITTLE_ENDIAN)
+                    check(fields.getShort(20).toInt() == 1 && fields.getShort(22).toInt() == 2 &&
+                        fields.getInt(24) == 44100 && fields.getShort(34).toInt() == 16) { "Unsupported bundled PCM format" }
+                    val size = fields.getInt(40)
+                    check(size in 4..40_000_000 && size % 4 == 0) { "Invalid WAV data size" }
+                    ByteArray(size).also { input.readFully(it) }
                 }
 
                 if (pcmRawBytes != null && pcmRawBytes.isNotEmpty()) {
@@ -201,7 +199,7 @@ class TravelVideoEncoder(
                     val inputBuf = enc.getInputBuffer(inIdx) ?: break
                     inputBuf.clear()
 
-                    val maxChunkBytes = minOf(inputBuf.capacity(), 4096)
+                    val maxChunkBytes = minOf(inputBuf.capacity(), 4096, ((totalAudioSamples - audioSamplesFed) * 4).toInt())
                     val chunkBytes = ByteArray(maxChunkBytes)
                     var filled = 0
 
@@ -249,6 +247,7 @@ class TravelVideoEncoder(
 
             // 4. Main Render & Encode Frame Loop (P0-01, P0-02)
             for (frameIndex in 0 until totalFrames) {
+                coroutineContext.ensureActive()
                 if (isCancelled.get()) {
                     throw InterruptedException("Video encoding cancelled by user")
                 }
@@ -257,8 +256,7 @@ class TravelVideoEncoder(
                 val framePtsNs = frameIndex.toLong() * 1_000_000_000L / fps.toLong()
 
                 // Render into reusable canvas/bitmap and submit via EGL with explicit PTS
-                renderer.renderFrame(reusableCanvas, width, height, storyTimeSeconds)
-                codecInputSurface.drawFrame(reusableBitmap, framePtsNs)
+                renderer.renderGlFrame(codecInputSurface, reusableBitmap, reusableCanvas, width, height, storyTimeSeconds, framePtsNs)
 
                 // Feed and drain audio
                 if (audioEncoder != null) {
@@ -388,6 +386,7 @@ class TravelVideoEncoder(
             } catch (_: Exception) {}
 
             try {
+                renderer.release()
                 codecInputSurface?.release()
             } catch (_: Exception) {}
 
@@ -399,7 +398,6 @@ class TravelVideoEncoder(
                 reusableBitmap?.recycle()
             } catch (_: Exception) {}
 
-            renderer.release()
         }
     }
 }

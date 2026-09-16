@@ -22,6 +22,19 @@ class RoomMigrationAndroidTest {
 
 
     @Test
+    fun migrate5To6_preservesJourneyAndAddsNullableElevation() {
+        helper.createDatabase(TEST_DB, 5).apply {
+            execSQL("INSERT INTO trips VALUES('t6', 'Kept trip', '2026-07-01', '2026-07-02', 100.0, '[]', '[]', 0, 1000)")
+            close()
+        }
+        helper.runMigrationsAndValidate(TEST_DB, 6, true, TravelerDatabase.MIGRATION_5_6).use { db ->
+            db.query("SELECT title FROM trips WHERE id='t6'").use { c ->
+                assertTrue(c.moveToFirst()); assertEquals("Kept trip", c.getString(0))
+            }
+        }
+    }
+
+    @Test
     fun migrate2To3_containsCaptureTimezoneId() {
         helper.createDatabase(TEST_DB, 2).apply {
             execSQL("INSERT INTO trips VALUES('t1', 'Trip 1', '2026-07-01', '2026-07-02', 100.0, '[]', '[]', 0, 1000)")

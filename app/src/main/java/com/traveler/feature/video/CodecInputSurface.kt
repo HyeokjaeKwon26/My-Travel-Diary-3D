@@ -79,6 +79,7 @@ class CodecInputSurface(
             EGL14.EGL_GREEN_SIZE, 8,
             EGL14.EGL_BLUE_SIZE, 8,
             EGL14.EGL_ALPHA_SIZE, 8,
+            EGL14.EGL_DEPTH_SIZE, 16,
             EGL14.EGL_RENDERABLE_TYPE, EGL14.EGL_OPENGL_ES2_BIT,
             0x3142, 1, // EGL_RECORDABLE_ANDROID
             EGL14.EGL_NONE
@@ -185,11 +186,14 @@ class CodecInputSurface(
      * Uploads the [bitmap] texture, renders the full-screen quad, sets explicit presentation timestamp
      * via [EGLExt.eglPresentationTimeANDROID], and swaps EGL buffers.
      */
-    fun drawFrame(bitmap: Bitmap, presentationTimeNs: Long) {
+    fun drawFrame(bitmap: Bitmap, presentationTimeNs: Long, clear: Boolean = true) {
         makeCurrent()
 
         GLES20.glViewport(0, 0, width, height)
-        GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT)
+        if (clear) GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT)
+        GLES20.glDisable(GLES20.GL_DEPTH_TEST)
+        GLES20.glEnable(GLES20.GL_BLEND)
+        GLES20.glBlendFunc(GLES20.GL_ONE, GLES20.GL_ONE_MINUS_SRC_ALPHA)
 
         GLES20.glUseProgram(program)
 

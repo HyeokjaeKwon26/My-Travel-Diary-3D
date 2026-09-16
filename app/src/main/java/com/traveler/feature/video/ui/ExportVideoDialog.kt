@@ -49,6 +49,25 @@ fun ExportVideoDialog(
     var exportState by remember { mutableStateOf<VideoExportState>(VideoExportState.Idle) }
     var currentEncoder by remember { mutableStateOf<com.traveler.feature.video.TravelVideoEncoder?>(null) }
     var exportJob by remember { mutableStateOf<kotlinx.coroutines.Job?>(null) }
+    fun saveToGallery(state: VideoExportState.Ready) {
+        coroutineScope.launch {
+            val uri = TravelVideoExporter.saveVideoToMediaStore(context, state.videoFile, trip.title, trip.startDateIso, trip.endDateIso)
+            if (uri != null) {
+                exportState = state.copy(isSavedToGallery = true)
+                Toast.makeText(context, "Saved to Movies/My Travel Diary 3D", Toast.LENGTH_LONG).show()
+            } else Toast.makeText(context, "Failed to save video", Toast.LENGTH_SHORT).show()
+        }
+    }
+    val legacyWritePermission = androidx.activity.compose.rememberLauncherForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        if (granted) (exportState as? VideoExportState.Ready)?.let { saveToGallery(it) }
+        else Toast.makeText(context, "Storage permission is needed to save to the gallery on this Android version", Toast.LENGTH_LONG).show()
+    }
+
+    DisposableEffect(Unit) {
+        onDispose { currentEncoder?.cancel(); exportJob?.cancel() }
+    }
 
     // Dynamically calculate estimated durations for the 3 profiles (P1)
     val shortTimeline = remember(trip, renderModel) {
@@ -188,6 +207,7 @@ fun ExportVideoDialog(
                                     StoryDurationProfile.FULL_STORY -> fullTimeline
                                 }
                                 exportJob = coroutineScope.launch {
+                                    try {
                                     val file = TravelVideoExporter.exportVideo(
                                         context = context,
                                         trip = trip,
@@ -205,6 +225,14 @@ fun ExportVideoDialog(
                                     } else {
                                         exportState = VideoExportState.Error("Failed to encode video.")
                                     }
+                                    } catch (e: kotlinx.coroutines.CancellationException) {
+                                        throw e
+                                    } catch (e: Exception) {
+                                        exportState = VideoExportState.Error(e.message ?: "Video export failed")
+                                    } finally {
+                                        currentEncoder = null
+                                    }
+
                                 }
                             },
                             modifier = Modifier.fillMaxWidth()
@@ -315,21 +343,11 @@ fun ExportVideoDialog(
                             ) {
                                 OutlinedButton(
                                     onClick = {
-                                        coroutineScope.launch {
-                                            val uri = TravelVideoExporter.saveVideoToMediaStore(
-                                                context = context,
-                                                videoFile = state.videoFile,
-                                                tripTitle = trip.title,
-                                                startDateIso = trip.startDateIso,
-                                                endDateIso = trip.endDateIso
-                                            )
-                                            if (uri != null) {
-                                                exportState = state.copy(isSavedToGallery = true)
-                                                Toast.makeText(context, "Saved to Movies/My Travel Diary", Toast.LENGTH_LONG).show()
-                                            } else {
-                                                Toast.makeText(context, "Failed to save video", Toast.LENGTH_SHORT).show()
-                                            }
-                                        }
+                                        if (android.os.Build.VERSION.SDK_INT <= 28 &&
+                                            androidx.core.content.ContextCompat.checkSelfPermission(context, android.Manifest.permission.WRITE_EXTERNAL_STORAGE) != android.content.pm.PackageManager.PERMISSION_GRANTED) {
+                                            legacyWritePermission.launch(android.Manifest.permission.WRITE_EXTERNAL_STORAGE)
+                                        } else saveToGallery(state)
+
                                     },
                                     modifier = Modifier.weight(1f)
                                 ) {

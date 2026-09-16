@@ -301,28 +301,8 @@ class TravelMapRenderer(
             val prov = seg.geometryProvenance
             val hasDetailedGeometry = seg.simplifiedPoints.size > 2 || seg.rawPoints.isNotEmpty()
 
-            val rawPath = if (isFlight && seg.simplifiedPoints.size <= 2) {
-                WebMercator.generateGreatCirclePath(seg.startPoint, seg.endPoint, steps = 32)
-            } else if (seg.simplifiedPoints.isNotEmpty()) {
-                seg.simplifiedPoints
-            } else {
-                listOf(seg.startPoint, seg.endPoint)
-            }
-
-            // P1-05: Render-only snap to adjacent Visit if within 30m
-            val snappedPath = ArrayList<GeoPoint>(rawPath.size)
-            for (ptIdx in rawPath.indices) {
-                var pt = rawPath[ptIdx]
-                if (ptIdx == 0) {
-                    val nearestVisit = renderModel.visits.find { GeodesicUtils.distanceMeters(it.location, pt) <= 30.0 }
-                    if (nearestVisit != null) pt = nearestVisit.location
-                } else if (ptIdx == rawPath.size - 1) {
-                    val nearestVisit = renderModel.visits.find { GeodesicUtils.distanceMeters(it.location, pt) <= 30.0 }
-                    if (nearestVisit != null) pt = nearestVisit.location
-                }
-                snappedPath.add(pt)
-                allPoints.add(pt)
-            }
+            val snappedPath = com.traveler.core.terrain.SharedRouteGeometry.path(seg)
+            allPoints.addAll(snappedPath)
 
             var totalDist = 0.0
             val cumDists = ArrayList<Double>(snappedPath.size)
@@ -358,37 +338,6 @@ class TravelMapRenderer(
                 )
             )
 
-            // P1-05: Continuity Connector for Small Gaps (<= 500m & <= 15min) between consecutive segments
-            if (i < sortedSegments.size - 1) {
-                val nextSeg = sortedSegments[i + 1]
-                val gapDist = GeodesicUtils.distanceMeters(seg.endPoint, nextSeg.startPoint)
-                val gapTimeMs = nextSeg.startTimestampEpochMs - seg.endTimestampEpochMs
-                if (gapDist in 1.0..500.0 && gapTimeMs in 0L..900_000L) {
-                    val connectorPath = listOf(seg.endPoint, nextSeg.startPoint)
-                    val dummySeg = MovementSegment(
-                        id = "conn_${seg.id}_${nextSeg.id}",
-                        startTimestampEpochMs = seg.endTimestampEpochMs,
-                        endTimestampEpochMs = nextSeg.startTimestampEpochMs,
-                        startPoint = seg.endPoint,
-                        endPoint = nextSeg.startPoint,
-                        distanceMeters = gapDist,
-                        durationMillis = gapTimeMs,
-                        transport = seg.transport,
-                        geometryProvenance = GeometryProvenance.CONTINUITY_ESTIMATE
-                    )
-                    preparedSegments.add(
-                        PreparedSegment(
-                            segment = dummySeg,
-                            pathPoints = connectorPath,
-                            midLocation = GeodesicUtils.interpolate(seg.endPoint, nextSeg.startPoint, 0.5),
-                            midHeadingDegrees = GeodesicUtils.initialBearing(seg.endPoint, nextSeg.startPoint).toFloat(),
-                            isFlight = false,
-                            isEstimated = true,
-                            isContinuityConnector = true
-                        )
-                    )
-                }
-            }
         }
 
         // P1-04A: Deduplicate fallback city labels across nearby visits

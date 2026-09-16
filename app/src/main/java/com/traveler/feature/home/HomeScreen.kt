@@ -39,7 +39,7 @@ fun HomeScreen(
                 title = {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text(
-                            text = "My Travel Diary",
+                            text = "My Travel Diary 3D",
                             fontWeight = FontWeight.Bold,
                             fontSize = 22.sp
                         )
@@ -95,7 +95,7 @@ fun HomeScreen(
                     onDismissRequest = { tripPendingDelete = null },
                     title = { Text("Delete \"${tripToDelete.title}\"?") },
                     text = {
-                        Text("This removes the saved travel story and its locally stored timeline/media references from My Travel Diary. Original gallery photos are not deleted.")
+                        Text("This removes the saved travel story and its locally stored timeline/media references from My Travel Diary 3D. Original gallery photos are not deleted.")
                     },
                     confirmButton = {
                         TextButton(

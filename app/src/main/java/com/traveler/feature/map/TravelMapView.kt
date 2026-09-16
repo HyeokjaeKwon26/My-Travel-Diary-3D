@@ -68,15 +68,7 @@ fun TravelMapView(
 
     // Load/prepare 10m regional basemap off the UI thread (P0-06, P0-07)
     var regionalBasemapVersion by remember { mutableStateOf(if (RegionalBasemapCache.isReady) 1 else 0) }
-    LaunchedEffect(Unit) {
-        if (!RegionalBasemapCache.isReady) {
-            val prep = RegionalBasemapCache.ensureLoaded(context.applicationContext)
-            if (prep != null) {
-                renderer.setPreparedRegionalBasemap(prep)
-                regionalBasemapVersion++ // Trigger instant redraw with 10m detail
-            }
-        }
-    }
+
 
     val renderModel = remember(visits, segments, photos, focusedLocation) {
         TravelMapRenderModel(
@@ -112,6 +104,17 @@ fun TravelMapView(
     var isPlaying by remember(initialIsPlaying) { mutableStateOf(initialIsPlaying) }
     var playbackProgress by remember(initialPlaybackProgress) { mutableStateOf(initialPlaybackProgress) }
     var playbackSpeed by remember { mutableStateOf(1.0f) }
+    val playbackLifecycle = androidx.compose.ui.platform.LocalLifecycleOwner.current.lifecycle
+    DisposableEffect(playbackLifecycle) {
+        val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
+            if (event == androidx.lifecycle.Lifecycle.Event.ON_PAUSE) {
+                isPlaying = false
+                soundtrackPlayer.pause()
+            }
+        }
+        playbackLifecycle.addObserver(observer)
+        onDispose { playbackLifecycle.removeObserver(observer) }
+    }
     val continuityDiagnostic = remember { PlaybackContinuityDiagnostic() }
     LaunchedEffect(storyTimeline) {
         continuityDiagnostic.recordTimelineDiagnostics(storyTimeline.diagnostics)
@@ -154,7 +157,7 @@ fun TravelMapView(
     }
 
     // Playback loop driven by monotonic clock and withFrameNanos (P1-05)
-    LaunchedEffect(isPlaying, initialPlaybackProgress) {
+    LaunchedEffect(isPlaying, initialPlaybackProgress, timeTracker) {
         if (isPlaying) {
             if (isMusicEnabled) {
                 soundtrackPlayer.start()
@@ -188,6 +191,16 @@ fun TravelMapView(
             .background(Color(0xFFF1F5F9))
             .clip(RoundedCornerShape(12.dp))
     ) {
+        com.traveler.feature.map.threed.Map3DLayer(renderModel, storyTimeline, currentActiveState) {
+    LaunchedEffect(Unit) {
+        if (!RegionalBasemapCache.isReady) {
+            val prep = RegionalBasemapCache.ensureLoaded(context.applicationContext)
+            if (prep != null) {
+                renderer.setPreparedRegionalBasemap(prep)
+                regionalBasemapVersion++ // Trigger instant redraw with 10m detail
+            }
+        }
+    }
         // Main Vector Canvas Render View with safe insets (explicit state observation in draw scope)
         ComposeCanvas(modifier = Modifier.fillMaxSize()) {
             val width = size.width.toInt()
@@ -220,6 +233,7 @@ fun TravelMapView(
             }
         }
 
+        }
         Column(
             modifier = Modifier
                 .align(Alignment.TopStart)

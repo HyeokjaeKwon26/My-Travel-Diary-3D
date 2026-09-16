@@ -19,7 +19,7 @@ import org.robolectric.annotation.Config
 class RouteContinuityAnalysisTest {
 
     @Test
-    fun smallGapBetweenConsecutiveSegments_generatesContinuityConnector() {
+    fun smallGapBetweenConsecutiveSegments_doesNotInventRoad() {
         val p1 = GeoPoint(40.7128, -74.0060)
         val p2 = GeoPoint(40.7140, -74.0040)
         val p3 = GeoPoint(40.7150, -74.0030) // ~150m away from p2
@@ -52,9 +52,9 @@ class RouteContinuityAnalysisTest {
         val renderer = TravelMapRenderer(null)
         val prep = renderer.prepareMap(TravelMapRenderModel(emptyList(), listOf(s1, s2), emptyList()))
 
-        // Should have 3 prepared segments: s1, connector, s2
-        assertEquals(3, prep.preparedSegments.size)
-        assertTrue(prep.preparedSegments.any { it.isContinuityConnector })
+        // Proximity alone cannot prove a traversable road across a canyon.
+        assertEquals(2, prep.preparedSegments.size)
+        assertFalse(prep.preparedSegments.any { it.isContinuityConnector })
     }
 
     @Test
@@ -97,7 +97,7 @@ class RouteContinuityAnalysisTest {
     }
 
     @Test
-    fun endpointWithin30mOfVisit_snapsVisuallyWithoutMutatingOriginalSegment() {
+    fun endpointNearVisit_keepsTheSamePathAsPlayback() {
         val vLoc = GeoPoint(40.712800, -74.006000)
         val sStart = GeoPoint(40.712810, -74.006010) // ~1.5m away
         val sEnd = GeoPoint(40.720000, -74.000000)
@@ -109,9 +109,13 @@ class RouteContinuityAnalysisTest {
         val prep = renderer.prepareMap(TravelMapRenderModel(listOf(visit), listOf(seg), emptyList()))
 
         val prepSeg = prep.preparedSegments.first()
-        assertEquals(vLoc.latitude, prepSeg.pathPoints.first().latitude, 0.000001)
-        assertEquals(vLoc.longitude, prepSeg.pathPoints.first().longitude, 0.000001)
+        assertEquals(sStart.latitude, prepSeg.pathPoints.first().latitude, 0.000001)
+        assertEquals(sStart.longitude, prepSeg.pathPoints.first().longitude, 0.000001)
 
+        val timeline = com.traveler.feature.map.story.TravelStoryTimeline.build(
+            TravelMapRenderModel(listOf(visit), listOf(seg)), com.traveler.core.media.StoryDurationProfile.STANDARD)
+        val episode = timeline.episodes.filterIsInstance<com.traveler.feature.map.story.StoryEpisode.MovementEpisode>().first()
+        assertEquals(prepSeg.pathPoints, episode.pathPoints)
         // Original segment coordinates remain immutable
         assertEquals(sStart.latitude, seg.startPoint.latitude, 0.000001)
     }

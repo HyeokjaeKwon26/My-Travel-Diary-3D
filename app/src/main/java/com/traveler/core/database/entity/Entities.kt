@@ -45,7 +45,8 @@ data class VisitEntity(
     val endTimestampEpochMs: Long,
     val confidence: Float,
     val timezoneId: String? = null,
-    val isUserOverride: Boolean
+    val isUserOverride: Boolean,
+    val altitudeMeters: Double? = null
 )
 
 @Entity(
@@ -77,7 +78,11 @@ data class MovementSegmentEntity(
     val userOverrideTransportMode: String? = null,
     val polylineJson: String,
     val isUserOverride: Boolean,
-    val geometryProvenance: String = "UNKNOWN"
+    val geometryProvenance: String = "UNKNOWN",
+    val startAltitudeMeters: Double? = null,
+    val endAltitudeMeters: Double? = null,
+    @androidx.room.ColumnInfo(defaultValue = "''")
+    val rawPointsJson: String = ""
 )
 
 @Entity(

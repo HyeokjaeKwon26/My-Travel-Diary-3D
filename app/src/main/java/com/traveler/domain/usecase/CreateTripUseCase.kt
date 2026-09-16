@@ -217,7 +217,9 @@ class CreateTripUseCase(
                     location = location,
                     locationConfidence = locationConfidence,
                     confidenceScore = confScore,
-                    captureEvidence = candidate.effectiveEvidence
+                    captureEvidence = candidate.effectiveEvidence,
+                    isRepresentative = durableOverrides[Pair("MEDIA_REPRESENTATIVE", candidate.id)]
+                        ?.overrideValue?.toBooleanStrictOrNull() ?: false
                 )
             }
 

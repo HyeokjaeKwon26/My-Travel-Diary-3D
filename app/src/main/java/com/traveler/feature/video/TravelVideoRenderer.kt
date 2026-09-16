@@ -14,7 +14,7 @@ import com.traveler.feature.map.story.TravelStoryTimeline
 import java.io.InputStream
 
 /**
- * Offscreen Canvas Video Frame Renderer (P1).
+ * Shared GPU scene with a transparent Canvas photo/title overlay.
  *
  * Renders pure, cinematic 1080x1920 (9:16 vertical) frames directly to a native [Canvas]
  * driven by the deterministic [TravelStoryTimeline].
@@ -29,12 +29,32 @@ class TravelVideoRenderer(
     basemapStream: InputStream,
     private val renderModel: TravelMapRenderModel,
     private val timeline: TravelStoryTimeline,
-    private val generalizeHomeAddress: Boolean = true
+    private val generalizeHomeAddress: Boolean = true,
+    private val sceneGeometry: com.traveler.feature.map.threed.SceneGeometry =
+        com.traveler.feature.map.threed.SceneGeometry(renderModel, timeline, emptyList())
 ) {
     private val mapRenderer = TravelMapRenderer(basemapStream).apply {
         RegionalBasemapCache.preparedRegionalBasemap?.let { setPreparedRegionalBasemap(it) }
     }
-    private val photoBitmapCache = mutableMapOf<String, Bitmap>()
+    private val photoBitmapCache = object : android.util.LruCache<String, Bitmap>(24 * 1024 * 1024) {
+        override fun sizeOf(key: String, value: Bitmap) = value.allocationByteCount
+        override fun entryRemoved(evicted: Boolean, key: String, oldValue: Bitmap, newValue: Bitmap?) {
+            if (oldValue !== newValue) oldValue.recycle()
+        }
+    }
+    private var glRenderer: com.traveler.feature.map.threed.TravelGlRenderer? = null
+    private val calmCamera = context.getSharedPreferences("scene_preferences", 0).getBoolean("calm", false)
+
+    fun renderGlFrame(surface: CodecInputSurface, bitmap: Bitmap, canvas: Canvas, width: Int, height: Int,
+                      storySeconds: Float, ptsNs: Long) {
+        surface.makeCurrent()
+        val gl = glRenderer ?: com.traveler.feature.map.threed.TravelGlRenderer(context, sceneGeometry)
+            .also { it.initialize(); glRenderer = it }
+        gl.render(width, height, timeline.evaluateAtStoryTime(storySeconds), calmCamera)
+        canvas.drawColor(Color.TRANSPARENT, PorterDuff.Mode.CLEAR)
+        renderFrame(canvas, width, height, storySeconds, renderMap = false)
+        surface.drawFrame(bitmap, ptsNs, clear = false)
+    }
 
     fun loadRegionalBasemap(stream: InputStream) {
         mapRenderer.loadRegionalBasemap(stream)
@@ -69,7 +89,8 @@ class TravelVideoRenderer(
         canvas: Canvas,
         width: Int,
         height: Int,
-        storyTimeSeconds: Float
+        storyTimeSeconds: Float,
+        renderMap: Boolean = true
     ) {
         val totalSec = maxOf(0.001f, timeline.totalStoryDurationSeconds)
         val progress = (storyTimeSeconds / totalSec).coerceIn(0f, 1f)
@@ -83,7 +104,7 @@ class TravelVideoRenderer(
             bottom = height * 0.12f
         )
 
-        mapRenderer.render(
+        if (renderMap) mapRenderer.render(
             canvas = canvas,
             width = width,
             height = height,
@@ -91,6 +112,12 @@ class TravelVideoRenderer(
             playbackState = playbackState,
             insets = insets
         )
+
+        if (!renderMap && sceneGeometry.uncertain(playbackState)) {
+            subtitlePaint.textSize = width * .026f
+            canvas.drawRoundRect(width*.12f, height*.46f, width*.88f, height*.51f, 16f, 16f, cardBackgroundPaint)
+            canvas.drawText("Elevation uncertain • vehicle hidden", width*.5f, height*.492f, subtitlePaint)
+        }
 
         // 2. Active Photo Moment Card Overlay (Top-Right / Side)
         playbackState.activePhoto?.let { photo ->
@@ -264,13 +291,11 @@ class TravelVideoRenderer(
 
         canvas.drawText(card.title, rect.centerX(), rect.top + cardHeight * 0.28f, titlePaint)
         canvas.drawText("${card.totalDaysStr} · ${card.totalDistanceStr}", rect.centerX(), rect.top + cardHeight * 0.52f, subtitlePaint)
-        canvas.drawText("${card.memoriesCountStr} · My Travel Diary", rect.centerX(), rect.top + cardHeight * 0.74f, subtitlePaint)
+        canvas.drawText("${card.memoriesCountStr} · My Travel Diary 3D", rect.centerX(), rect.top + cardHeight * 0.74f, subtitlePaint)
     }
 
     private fun getOrDecodePhotoBitmap(photo: MediaItem, reqWidth: Int, reqHeight: Int): Bitmap? {
-        if (photoBitmapCache.containsKey(photo.id)) {
-            return photoBitmapCache[photo.id]
-        }
+        photoBitmapCache.get(photo.id)?.let { return it }
         return try {
             val uri = android.net.Uri.parse(photo.contentUriString)
 
@@ -319,7 +344,7 @@ class TravelVideoRenderer(
                 rawBmp
             }
 
-            photoBitmapCache[photo.id] = finalBmp
+            photoBitmapCache.put(photo.id, finalBmp)
             finalBmp
         } catch (_: Exception) {
             null
@@ -339,9 +364,8 @@ class TravelVideoRenderer(
     }
 
     fun release() {
-        for (bmp in photoBitmapCache.values) {
-            try { bmp.recycle() } catch (_: Exception) {}
-        }
-        photoBitmapCache.clear()
+        photoBitmapCache.evictAll()
+        glRenderer?.release()
+        glRenderer = null
     }
 }

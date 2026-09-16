@@ -8,13 +8,7 @@ import com.traveler.feature.map.renderer.TravelMapRenderModel
 import org.junit.Assert.*
 import org.junit.Test
 
-/**
- * Unit tests verifying:
- * 1. Gap-Bridging ("timeline에 비어있는 곳은 부드럽게 그라데이션 하듯이 이동"):
- *    Guarantees 100% spatial continuity between all episodes with zero teleports.
- * 2. Elevation / Altitude ("고도추가"):
- *    Verifies live altitude tracking, flight climb/cruise curves, and terrain elevation.
- */
+/** Missing observations remain missing: no inferred roads, transport or measured altitude. */
 class GapBridgingAndAltitudeTest {
 
     private fun createTripWithGaps(): TravelMapRenderModel {
@@ -68,76 +62,24 @@ class GapBridgingAndAltitudeTest {
     }
 
     @Test
-    fun testGapBridgingEliminatesAllSpatialJumps() {
-        val trip = createTripWithGaps()
-        val timeline = TravelStoryTimeline.build(trip, StoryDurationProfile.STANDARD)
-
-        assertTrue("Timeline must have generated episodes", timeline.episodes.isNotEmpty())
-
-        // 1. Verify that every episode's end matches the next episode's start (ZERO SPATIAL GAP)
-        for (i in 0 until timeline.episodes.size - 1) {
-            val curr = timeline.episodes[i]
-            val next = timeline.episodes[i + 1]
-
-            val currEnd = when (curr) {
-                is StoryEpisode.VisitEpisode -> curr.visit.location
-                is StoryEpisode.MovementEpisode -> curr.pathPoints.last()
-            }
-            val nextStart = when (next) {
-                is StoryEpisode.VisitEpisode -> next.visit.location
-                is StoryEpisode.MovementEpisode -> next.pathPoints.first()
-            }
-
-            val gap = GeodesicUtils.distanceMeters(currEnd, nextStart)
-            assertEquals(
-                "Distance between episode $i (${curr.stableId}) and episode ${i + 1} (${next.stableId}) must be <= 1 meter",
-                0.0,
-                gap,
-                1.0
-            )
-        }
-
-        // 2. Continuous playback diagnostic verification
+    fun missingRecordingDoesNotInventDrivingOrFlight() {
+        val timeline = TravelStoryTimeline.build(createTripWithGaps(), StoryDurationProfile.STANDARD)
+        val movements = timeline.episodes.filterIsInstance<StoryEpisode.MovementEpisode>()
+        assertEquals(listOf("s_dc"), movements.map { it.segment.id })
+        assertEquals(3, timeline.episodes.filterIsInstance<StoryEpisode.VisitEpisode>().size)
+        assertFalse(movements.any { it.segment.id.startsWith("bridge_") })
         val diagnostic = PlaybackContinuityDiagnostic()
-        val steps = 500
-        for (step in 0..steps) {
-            val p = step.toFloat() / steps.toFloat()
-            val state = timeline.evaluate(p)
-            diagnostic.recordFrame(state, isUserScrubbing = false)
-        }
-
-        assertEquals("PlaybackProgress backward count must be 0", 0, diagnostic.playbackProgressBackwardCount)
-        assertEquals("EpisodeIndex backward count must be 0", 0, diagnostic.episodeIndexBackwardCount)
-        assertEquals("Completed episode reactivation count must be 0", 0, diagnostic.completedEpisodeReactivationCount)
-        assertEquals("Spatial jump count must be 0 across entire trip", 0, diagnostic.spatialJumpCount)
+        for (step in 0..500) diagnostic.recordFrame(timeline.evaluate(step / 500f), false)
+        assertEquals(0, diagnostic.playbackProgressBackwardCount)
+        assertEquals(0, diagnostic.episodeIndexBackwardCount)
     }
 
     @Test
-    fun testAltitudeTrackingAcrossTripAndFlights() {
-        val trip = createTripWithGaps()
-        val timeline = TravelStoryTimeline.build(trip, StoryDurationProfile.STANDARD)
-
-        val steps = 300
-        var maxAltitude = 0.0
-        var hasValidAltitudeAtAllSteps = true
-
-        for (step in 0..steps) {
-            val p = step.toFloat() / steps.toFloat()
-            val state = timeline.evaluate(p)
-            val alt = state.currentAltitudeMeters
-
-            if (alt == null || alt <= 0.0) {
-                hasValidAltitudeAtAllSteps = false
-            } else {
-                if (alt > maxAltitude) maxAltitude = alt
-            }
-        }
-
-        assertTrue("Altitude must be present and positive at all playback steps", hasValidAltitudeAtAllSteps)
-        assertTrue(
-            "Flight / high altitude bridge must reach cruising altitude >= 5,000 meters (got $maxAltitude m)",
-            maxAltitude >= 5_000.0
-        )
+    fun absentFlightDoesNotManufactureCruisingAltitude() {
+        val timeline = TravelStoryTimeline.build(createTripWithGaps(), StoryDurationProfile.STANDARD)
+        val states = (0..300).map { timeline.evaluate(it / 300f) }
+        assertTrue(states.all { it.currentAltitudeMeters == null || it.currentAltitudeMeters!! <= 180.0 })
+        assertFalse(states.any { it.currentTransportMode == TransportMode.AIRPLANE })
     }
 
     @Test

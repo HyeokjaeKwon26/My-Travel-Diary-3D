@@ -142,7 +142,7 @@ fun TravelDiaryScreen(
                             focusedLocation = focusedLocation,
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .height(230.dp)
+                                .height(310.dp)
                         )
 
                         // 2. Chronological Diary Timeline List

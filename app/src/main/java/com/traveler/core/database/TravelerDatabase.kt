@@ -17,7 +17,7 @@ import com.traveler.core.database.entity.*
         TripMediaEntity::class,
         UserOverrideEntity::class
     ],
-    version = 5,
+    version = 6,
     exportSchema = true
 )
 abstract class TravelerDatabase : RoomDatabase() {
@@ -225,6 +225,15 @@ abstract class TravelerDatabase : RoomDatabase() {
             }
         }
 
+        val MIGRATION_5_6 = object : Migration(5, 6) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE visits ADD COLUMN altitudeMeters REAL")
+                db.execSQL("ALTER TABLE movement_segments ADD COLUMN startAltitudeMeters REAL")
+                db.execSQL("ALTER TABLE movement_segments ADD COLUMN endAltitudeMeters REAL")
+                db.execSQL("ALTER TABLE movement_segments ADD COLUMN rawPointsJson TEXT NOT NULL DEFAULT ''")
+            }
+        }
+
         fun getDatabase(context: Context): TravelerDatabase {
             return INSTANCE ?: synchronized(this) {
                 val instance = Room.databaseBuilder(
@@ -232,7 +241,7 @@ abstract class TravelerDatabase : RoomDatabase() {
                     TravelerDatabase::class.java,
                     "traveler_database.db"
                 )
-                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6)
                 .build()
                 INSTANCE = instance
                 instance

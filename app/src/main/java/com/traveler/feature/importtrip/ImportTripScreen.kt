@@ -159,7 +159,7 @@ fun ImportTripScreen(
                                 Spacer(modifier = Modifier.width(10.dp))
                                 Column(modifier = Modifier.weight(1f)) {
                                     Text("Photos Linked (Videos Denied)", fontWeight = FontWeight.Bold, fontSize = 13.sp)
-                                    Text("My Travel Diary can access photos, but not videos.", fontSize = 12.sp)
+                                    Text("My Travel Diary 3D can access photos, but not videos.", fontSize = 12.sp)
                                 }
                                 TextButton(onClick = { requestMediaPermissions() }) {
                                     Text("Add Videos")
@@ -182,7 +182,7 @@ fun ImportTripScreen(
                                 Spacer(modifier = Modifier.width(10.dp))
                                 Column(modifier = Modifier.weight(1f)) {
                                     Text("Partial Photo Access", fontWeight = FontWeight.Bold, fontSize = 13.sp)
-                                    Text("My Travel Diary can currently see only selected photos.", fontSize = 12.sp)
+                                    Text("My Travel Diary 3D can currently see only selected photos.", fontSize = 12.sp)
                                 }
                                 TextButton(onClick = { requestMediaPermissions() }) {
                                     Text("Change")
@@ -373,6 +373,9 @@ fun ImportTripScreen(
 
                 HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
 
+                OutlinedButton(onClick = { viewModel.createCanyonDemoTrip() }, modifier = Modifier.fillMaxWidth()) {
+                    Text("Try Grand Canyon 3D • illustrative route")
+                }
                 // Quick Demo Generator
                 OutlinedButton(
                     onClick = { viewModel.createSampleDemoTrip() },

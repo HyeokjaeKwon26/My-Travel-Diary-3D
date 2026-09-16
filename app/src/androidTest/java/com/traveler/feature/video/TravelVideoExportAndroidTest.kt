@@ -47,7 +47,7 @@ class TravelVideoExportAndroidTest {
 
         val photo1 = MediaItem(
             id = "p_nyc_1",
-            contentUriString = "android.resource://com.traveler/drawable/ic_launcher_background",
+            contentUriString = "android.resource://com.traveler.threed/drawable/ic_launcher_background",
             fileName = "times_square.jpg",
             mimeType = "image/jpeg",
             timestampEpochMs = 1723803600000L,

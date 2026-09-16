@@ -41,3 +41,6 @@ captures/
 
 # Test runner output
 verification/unit-tests/
+
+# Locally generated 3D demo videos and delivery copies
+artifacts/

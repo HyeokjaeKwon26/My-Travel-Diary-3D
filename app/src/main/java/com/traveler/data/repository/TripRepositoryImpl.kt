@@ -67,7 +67,7 @@ class TripRepositoryImpl(
                 placeName = effectivePlaceName,
                 placeAddress = v.placeAddress,
                 placeId = v.placeId,
-                location = GeoPoint(v.latitude, v.longitude),
+                location = GeoPoint(v.latitude, v.longitude, v.altitudeMeters),
                 startTimestampEpochMs = v.startTimestampEpochMs,
                 endTimestampEpochMs = v.endTimestampEpochMs,
                 confidence = v.confidence,
@@ -96,8 +96,10 @@ class TripRepositoryImpl(
                 id = s.sourceId,
                 startTimestampEpochMs = s.startTimestampEpochMs,
                 endTimestampEpochMs = s.endTimestampEpochMs,
-                startPoint = GeoPoint(s.startLat, s.startLng),
-                endPoint = GeoPoint(s.endLat, s.endLng),
+                startPoint = GeoPoint(s.startLat, s.startLng, s.startAltitudeMeters),
+                endPoint = GeoPoint(s.endLat, s.endLng, s.endAltitudeMeters),
+                rawPoints = if (s.rawPointsJson.isBlank()) emptyList() else
+                    json.decodeFromString<List<LocationPoint>>(s.rawPointsJson),
                 simplifiedPoints = simplified,
                 distanceMeters = s.distanceMeters,
                 durationMillis = s.durationMillis,
@@ -196,7 +198,8 @@ class TripRepositoryImpl(
                             endTimestampEpochMs = visit.endTimestampEpochMs,
                             confidence = visit.confidence,
                             isUserOverride = visit.isUserOverride,
-                            timezoneId = visit.timezoneId
+                            timezoneId = visit.timezoneId,
+                            altitudeMeters = visit.location.altitudeMeters
                         )
                         for (photo in item.photos) {
                             val photoWithVisit = photo.copy(
@@ -227,7 +230,10 @@ class TripRepositoryImpl(
                             isUserOverride = seg.isUserOverride,
                             startTimezoneId = seg.startTimezoneId,
                             endTimezoneId = seg.endTimezoneId,
-                            geometryProvenance = seg.geometryProvenance.name
+                            geometryProvenance = seg.geometryProvenance.name,
+                            startAltitudeMeters = seg.startPoint.altitudeMeters,
+                            endAltitudeMeters = seg.endPoint.altitudeMeters,
+                            rawPointsJson = if (seg.rawPoints.isEmpty()) "" else json.encodeToString(seg.rawPoints)
                         )
                         for (photo in item.photos) {
                             val photoWithSeg = photo.copy(

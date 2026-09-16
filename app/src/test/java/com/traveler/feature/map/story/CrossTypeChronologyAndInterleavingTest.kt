@@ -241,11 +241,11 @@ class CrossTypeChronologyAndInterleavingTest {
         assertEquals(0, timeline.diagnostics.backwardEpisodeChronologyCount)
         assertEquals(0, timeline.diagnostics.overlapGeneratedBridgeCount)
 
-        // Ep 0: Drive A->B, Ep 1: Bridge B->D (legitimate gap continuity), Ep 2: Visit at D
-        assertEquals(3, timeline.episodes.size)
+        // A forward time gap is not evidence of a drivable straight road.
+        assertEquals(2, timeline.episodes.size)
         assertTrue(timeline.episodes[0] is StoryEpisode.MovementEpisode)
-        assertTrue(timeline.episodes[1] is StoryEpisode.MovementEpisode)
-        assertTrue((timeline.episodes[1] as StoryEpisode.MovementEpisode).stableId.contains("bridge"))
-        assertTrue(timeline.episodes[2] is StoryEpisode.VisitEpisode)
+        assertTrue(timeline.episodes[1] is StoryEpisode.VisitEpisode)
+        assertFalse(timeline.episodes.any { it.stableId.contains("bridge") })
+
     }
 }
