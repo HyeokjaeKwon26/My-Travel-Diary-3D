@@ -2,7 +2,7 @@
 
 ## New installation
 
-- Download **My-Travel-Diary-3D-1.0.0-rc10-arm64.apk** for Galaxy S23 Ultra and other ARM64 devices. **My-Travel-Diary-3D-1.0.0-rc10.apk** is the universal alternative for supported 32-bit ARM and x86 devices. Both use the same production signing key and release optimization; install only one.
+- Download **My-Travel-Diary-3D-1.0.0-rc11-arm64.apk** for Galaxy S23 Ultra and other ARM64 devices. **My-Travel-Diary-3D-1.0.0-rc11.apk** is the universal alternative for supported 32-bit ARM and x86 devices. Both use the same production signing key and release optimization; install only one.
 - Open the downloaded APK on your phone and allow installation from that source if Android asks.
 - Open My Travel Diary 3D and import your Timeline and photos. On Wi-Fi, the app prepares terrain around your journeys; pin a journey to keep its terrain for offline use.
 - The original 2D app (`com.traveler`) is separate and can stay installed. The 3D edition uses `com.traveler.threed`.

@@ -12,6 +12,9 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Fullscreen
+import androidx.compose.material.icons.filled.FullscreenExit
+import androidx.compose.ui.platform.testTag
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -44,7 +47,10 @@ fun TravelMapView(
     modifier: Modifier = Modifier,
     tripStartDateIso: String? = null,
     showMapOptions: Boolean = false,
-    onDismissMapOptions: () -> Unit = {}
+    onDismissMapOptions: () -> Unit = {},
+    photoSelections: Map<String, List<com.traveler.core.media.PhotoStoryMoment>>? = null,
+    fullscreen: Boolean = false,
+    onToggleFullscreen: (() -> Unit)? = null
 ) {
     val context = LocalContext.current
     val view = LocalView.current
@@ -66,12 +72,13 @@ fun TravelMapView(
     var regionalBasemapVersion by remember { mutableStateOf(if (RegionalBasemapCache.isReady) 1 else 0) }
 
 
-    val renderModel = remember(visits, segments, photos, focusedLocation) {
+    val renderModel = remember(visits, segments, photos, focusedLocation, photoSelections) {
         TravelMapRenderModel(
             visits = visits,
             segments = segments,
             photos = photos,
-            focusedLocation = focusedLocation
+            focusedLocation = focusedLocation,
+            photoSelections = photoSelections
         )
     }
 
@@ -219,7 +226,7 @@ fun TravelMapView(
                     left = 20f,
                     top = 28f,
                     right = 20f,
-                    bottom = if (active) 68f else 28f
+                    bottom = if (active) 110f else 28f
                 )
 
                 renderer.render(
@@ -277,12 +284,31 @@ fun TravelMapView(
             exit = fadeOut(),
             modifier = Modifier.align(Alignment.BottomCenter)
         ) {
-            Box(
+            Column(
                 modifier = Modifier
                     .fillMaxWidth()
                     .background(Color.Black.copy(alpha = 0.70f))
                     .padding(horizontal = 12.dp, vertical = 6.dp)
             ) {
+                Text(PlaybackClockLabel.label(playbackProgress, storyTimeline.totalStoryDurationSeconds),
+                    color = Color.White, fontSize = 12.sp,
+                    modifier = Modifier.testTag("playback-time"))
+                    // Progress Scrubber Slider
+                    Slider(
+                        value = playbackProgress,
+                        onValueChange = {
+                            isPlaying = false
+                            timeTracker.seekTo(it)
+                            playbackProgress = it
+                        },
+                        modifier = Modifier.fillMaxWidth().height(32.dp).testTag("playback-seek"),
+                        colors = SliderDefaults.colors(
+                            thumbColor = MaterialTheme.colorScheme.primary,
+                            activeTrackColor = MaterialTheme.colorScheme.primary,
+                            inactiveTrackColor = Color.White.copy(alpha = 0.3f)
+                        )
+                    )
+
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically,
@@ -327,21 +353,7 @@ fun TravelMapView(
                         )
                     }
 
-                    // Progress Scrubber Slider
-                    Slider(
-                        value = playbackProgress,
-                        onValueChange = {
-                            isPlaying = false
-                            timeTracker.seekTo(it)
-                            playbackProgress = it
-                        },
-                        modifier = Modifier.weight(1f),
-                        colors = SliderDefaults.colors(
-                            thumbColor = MaterialTheme.colorScheme.primary,
-                            activeTrackColor = MaterialTheme.colorScheme.primary,
-                            inactiveTrackColor = Color.White.copy(alpha = 0.3f)
-                        )
-                    )
+                    Spacer(Modifier.weight(1f))
 
                     // Playback Speed Selector (P1-06)
                     val speeds = listOf(0.5f, 1.0f, 1.5f, 2.0f, 3.0f)
@@ -390,11 +402,19 @@ fun TravelMapView(
                         )
                     }
 
+                    if (onToggleFullscreen != null) {
+                        IconButton(onClick = onToggleFullscreen, modifier = Modifier.size(48.dp)) {
+                            Icon(if (fullscreen) Icons.Default.FullscreenExit else Icons.Default.Fullscreen,
+                                contentDescription = if (fullscreen) "Exit fullscreen" else "Fullscreen", tint = Color.White)
+                        }
+                    }
+
                     // Close Playback Button
                     IconButton(
                         onClick = {
                             isPlaying = false
                             playbackSession = false
+                            if (fullscreen) onToggleFullscreen?.invoke()
                             soundtrackPlayer.stop()
                             timeTracker.pause()
                             timeTracker.seekTo(0.0f)

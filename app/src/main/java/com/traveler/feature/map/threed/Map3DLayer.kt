@@ -90,7 +90,7 @@ fun Map3DLayer(model:TravelMapRenderModel,timeline:TravelStoryTimeline,state:Tra
         if (scene?.uncertain(state) == true) Text("Height estimated",
             color=Color.White, fontSize=12.sp, modifier=Modifier.align(Alignment.Center)
                 .background(Color(0xDD102638),RoundedCornerShape(8.dp)).padding(8.dp))
-        if(use3D) Column(Modifier.align(Alignment.BottomStart).padding(start=6.dp,bottom=68.dp)
+        if(use3D) Column(Modifier.align(Alignment.BottomStart).padding(start=6.dp,bottom=if (state != null) 112.dp else 8.dp)
             .background(Color(0xDD102638),RoundedCornerShape(6.dp)).padding(horizontal=6.dp,vertical=3.dp)) {
             if(!mapStatus.startsWith("Street map")) Text(mapStatus,color=Color.White,fontSize=9.sp,lineHeight=11.sp)
             Text("N ↑ · © OpenStreetMap contributors · Natural Earth",color=Color.White,fontSize=9.sp,lineHeight=11.sp,

@@ -37,7 +37,8 @@ class ImportTripViewModel(application: Application) : AndroidViewModel(applicati
         mediaRepository = AndroidMediaStoreScanner(application),
         transportClassifier = RuleBasedTransportClassifier(),
         tripRepository = tripRepository,
-        analyzePhotos = com.traveler.core.media.PhotoVisualAnalyzer(application)::analyze
+        analyzePhotos = com.traveler.core.media.PhotoVisualAnalyzer(application)::analyze,
+        prepareMemories = { com.traveler.core.media.tripMemoryStore(application).prepare(it) }
     )
 
     private val _uiState = MutableStateFlow<ImportUiState>(ImportUiState.Idle)

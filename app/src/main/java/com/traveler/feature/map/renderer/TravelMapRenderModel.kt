@@ -9,5 +9,6 @@ data class TravelMapRenderModel(
     val visits: List<Visit>,
     val segments: List<MovementSegment>,
     val photos: List<MediaItem> = emptyList(),
-    val focusedLocation: GeoPoint? = null
+    val focusedLocation: GeoPoint? = null,
+    val photoSelections: Map<String, List<com.traveler.core.media.PhotoStoryMoment>>? = null
 )

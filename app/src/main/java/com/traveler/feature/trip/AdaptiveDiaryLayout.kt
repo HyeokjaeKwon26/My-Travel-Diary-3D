@@ -10,19 +10,19 @@ import androidx.compose.ui.unit.dp
 
 /** Both children keep their composition identity across rotation and split-screen resize. */
 @Composable
-internal fun AdaptiveDiaryLayout(map: @Composable () -> Unit, diary: @Composable () -> Unit) {
+internal fun AdaptiveDiaryLayout(map: @Composable () -> Unit, diary: @Composable () -> Unit, fullscreen: Boolean = false) {
     Layout(content = { Box { map() }; Box { diary() } }, modifier = Modifier.fillMaxSize()) { children, c ->
         val width = c.maxWidth
         val height = c.maxHeight
-        val sideBySide = width >= 840.dp.roundToPx() || (width >= 600.dp.roundToPx() && width > height)
+        val sideBySide = !fullscreen && (width >= 840.dp.roundToPx() || (width >= 600.dp.roundToPx() && width > height))
         val mapWidth = if(sideBySide) (width*.55f).toInt() else width
-        val mapHeight = if(sideBySide) height else (height*.44f).toInt().coerceAtMost(420.dp.roundToPx())
+        val mapHeight = if(fullscreen) height else if(sideBySide) height else (height*.44f).toInt().coerceAtMost(420.dp.roundToPx())
         val mapPlaceable = children[0].measure(Constraints.fixed(mapWidth,mapHeight))
         val listPlaceable = children[1].measure(Constraints.fixed(if(sideBySide) width-mapWidth else width,
-            if(sideBySide) height else height-mapHeight))
+            if(fullscreen || sideBySide) height else height-mapHeight))
         layout(width,height) {
             mapPlaceable.placeRelative(0,0)
-            listPlaceable.placeRelative(if(sideBySide) mapWidth else 0,if(sideBySide) 0 else mapHeight)
+            if (!fullscreen) listPlaceable.placeRelative(if(sideBySide) mapWidth else 0,if(sideBySide) 0 else mapHeight)
         }
     }
 }

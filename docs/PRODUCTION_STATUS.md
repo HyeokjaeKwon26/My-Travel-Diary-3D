@@ -1,3 +1,15 @@
+# 1.0.0-rc11 saved memories and fullscreen playback
+
+Photo analysis and per-profile photo selections now live in atomic, durable journey files under filesDir, outside Android's evictable cache. Existing journeys prepare this once; new imports prepare it while saving. Reopening unchanged metadata reads the saved selection without MediaStore queries, thumbnail decoding or ML inference. Failed analysis results are also frozen instead of silently changing on the next open. Saved photo additions/removals and representative overrides invalidate selection; only new/changed sources need analysis. Explicit photo refresh bypasses the descriptor cache and preserves manual representative flags. Deleting a journey removes its saved memory file. External gallery edits are picked up through explicit refresh; this does not add newly captured gallery photos to an already imported journey.
+
+All three story profiles persist their raw selected moments before scheduling. Live playback and video export consume the same selection. Metadata-derived input signatures and a serialized write lock avoid partially written or concurrently replaced results; cancellation before replacement leaves the previous saved version intact. No Room schema migration is required. Backups retain their existing format; restored journeys prepare their local memory file on first open.
+
+Fullscreen expands the existing map composition in place, hides the diary and top app bar, and permits sensor-driven portrait/landscape rotation. Fullscreen exit and Android Back return to the diary without resetting the playback position. System bars and orientation policy are restored on exit. The playback bar shows current story time / total story time, including photo holds and title/end durations. Speed changes affect advancement, not the displayed timeline length; exports using a different duration profile have their own length.
+
+Verification pending final build and emulator run.
+
+---
+
 # 1.0.0-rc10 diary and video presentation
 
 Date: 2026-09-16. Photo details now reserve the union of host-window and dialog safe insets, with a pinned representative-photo action and independently scrollable metadata. The last recorded Home card replaces its media thumbnail with a bounded 960×540 offline whole-route overview; original photos remain available through a gallery button. The overview fits actual journey bounds, including short trips, without the live map’s regional minimum scale. No map-provider or live-camera changes were made.
