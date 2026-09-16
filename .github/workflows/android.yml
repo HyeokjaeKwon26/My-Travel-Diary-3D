@@ -16,7 +16,8 @@ jobs:
           distribution: temurin
           java-version: '17'
       - name: Install Android SDK platform
-        run: "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" 'platforms;android-36' 'build-tools;35.0.0' >/dev/null
+        run: |
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" 'platforms;android-36' 'build-tools;35.0.0' >/dev/null
       - name: Unit tests, APK and lint
         run: |
           chmod +x gradlew
