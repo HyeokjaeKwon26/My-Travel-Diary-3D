@@ -1,21 +1,13 @@
 # Installation and signing
 
-## Which APK
+## New installation
 
-- First install of the 3D edition: use **My-Travel-Diary-3D-1.0.0-rc1.apk** (production signing key, release optimization).
-- Existing `v0.1.0-alpha` 3D installation: use **My-Travel-Diary-3D-1.0.0-rc1-alpha-update.apk** to preserve its data and add backup support. This is a debug-signed compatibility build; it cannot install over the production-signed build.
-- The original 2D app (`com.traveler`) is separate and can stay installed. Both new APK variants use `com.traveler.threed` and cannot coexist with one another.
+- Download **My-Travel-Diary-3D-1.0.0-rc1.apk** from the release page (production signing key, release optimization, 33.91 MB). This is the only installation APK distributed for RC1.
+- Open the downloaded APK on your phone and allow installation from that source if Android asks.
+- Open My Travel Diary 3D and import your Timeline and photos. On Wi-Fi, the app prepares terrain around your journeys; pin a journey to keep its terrain for offline use.
+- The original 2D app (`com.traveler`) is separate and can stay installed. The 3D edition uses `com.traveler.threed`.
 
-## Switching from the 3D alpha to production signing
-
-1. Install the alpha-update APK over the existing 3D alpha; do not uninstall first.
-2. In each journey’s Export dialog, choose **Back up this journey**. Keep Timeline source files and original gallery photos too.
-3. Check that the `.travel3d.json` files were saved outside the app’s private storage.
-4. Only after backing up all journeys, remove the debug-signed 3D app and install the release APK. Android requires this because the signatures differ.
-5. Home → **Restore**, choose each backup, and grant photo access in Android app permissions. Local photo references are intended for the same phone; original images are not copied into backups.
-6. Reopen journeys on Wi-Fi to prepare terrain again. Pin journeys for offline use.
-
-No code automatically uninstalls the alpha or clears existing trips.
+The owner confirmed that the earlier 3D alpha had no installations or users. No alpha migration, backup, or uninstall step is required before this new installation.
 
 ## Galaxy S23 Ultra
 
