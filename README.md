@@ -2,7 +2,7 @@
 
 An independent Android 3D edition of [My Travel Diary](https://github.com/HyeokjaeKwon26/My-Travel-Diary), based on original commit `9bcfb4f`.
 
-**Version: 1.0.0-rc7.** Non-blocking background map preparation, bounded 2D drawing, automatic north-up route framing, adaptive phone/tablet layouts, calendar dates, local visual photo selection, and portrait/landscape video creation and playback. Physical-device acceptance is pending; Galaxy S23 Ultra is the primary target. See [validation and remaining work](docs/PRODUCTION_STATUS.md).
+**Version: 1.0.0-rc8.** Accurate recorded-visit summaries, compact playback overlays, non-blocking background map preparation, bounded 2D drawing, automatic north-up route framing, adaptive phone/tablet layouts, calendar dates, local visual photo selection, and portrait/landscape video creation and playback. Physical-device acceptance is pending; Galaxy S23 Ultra is the primary target. See [validation and remaining work](docs/PRODUCTION_STATUS.md).
 
 ## 한국어
 
@@ -14,6 +14,12 @@ Google Timeline JSON과 휴대폰 사진을 여행 다이어리로 구성하고,
 - Android 8.0 이상을 대상으로 빌드합니다. 실제 지원 성능은 기기 검증이 더 필요합니다.
 
 ### 이번 버전
+
+- 여행 카드의 `places`를 `방문 기록 N회`로 바꿨습니다. 이름 없는 방문과 재방문을 포함하고, 여러 날짜에 걸친 같은 방문은 한 번만 셉니다. 기존 여행도 다시 가져올 필요 없이 적용됩니다.
+- `대표 장소`는 저장되거나 직접 수정한 이름을 최대 3개와 나머지 개수로 표시합니다. 이름 없는 방문만 있거나 Home/Work만 알려진 불완전한 기록은 `장소 이름 정보 부족`으로 표시합니다. 기록에 없는 장소를 추정하거나 도시 수로 해석하지 않습니다.
+- 카드의 거리·사진·방문 배지는 좁은 화면이나 큰 글꼴에서 자동 줄바꿈합니다.
+
+### 유지되는 기능
 
 - 재생 정보 창을 작은 이동수단·거리 표시와 얇은 진행 막대로 줄였습니다. 실제 날짜와 여행 일차를 재생·일시정지·탐색 중 계속 표시합니다.
 - 지도 위의 `3D • Terrain` / `2D • Options` 카드를 제거했습니다. 기존 지도 설정과 2D 전환은 여행 제목 옆 설정 버튼에서 열 수 있습니다.
@@ -54,7 +60,7 @@ Google Timeline JSON과 휴대폰 사진을 여행 다이어리로 구성하고,
 1. APK를 설치하고 **+ New Travel Story**를 누릅니다.
 2. **Try Grand Canyon 3D • illustrative route**를 누릅니다. 개인 위치 기록 없이 예제를 볼 수 있습니다.
 3. 여행 지도에서 재생 버튼을 누르거나 전체 화면으로 엽니다.
-4. **3D • Terrain**에서 카메라·2D 전환·지형 팩을 설정합니다.
+4. 여행 제목 옆 **설정 버튼**에서 2D 전환·지형 팩·상세 지도 사용을 설정합니다.
 5. 실제 여행은 새 여행 화면에서 Timeline JSON과 날짜를 선택하여 가져옵니다.
 
 예제 경로는 연출 확인용이며 실제 GPS 기록이나 도로에 맞춘 경로가 아닙니다. 지형은 실제 고도 샘플을 사용합니다.
