@@ -20,6 +20,14 @@ Home supports persisted name / creation time / travel start date sorting in both
 - Existing 31.2 km / 2-visit / 0-photo and 835.5 km / 5-visit / 4-photo fixtures survived update installation and process restart. Name/ascending selection persists; phone and 2560×1600 tablet layouts were inspected. [Sorted phone](verification-3d/rc10-sort-name.png), [tablet](verification-3d/rc10-home-tablet.png).
 - The API 36 emulator cold boot encountered system-service restarts and a System UI ANR. A stale instrumentation class referenced an earlier Trip schema; recompiling the test APK resolved the NoSuchMethodError, and the export rerun passed. These failed attempts are not counted as passed tests. Physical S23 Ultra remains unavailable. Remote CI is not counted as passed pending completion.
 
+- Final production-signed universal APK was installed over the existing app without removal, then force-stopped and restarted. Both saved journeys and name/ascending sorting survived. Version code 11 / RC10 is installed. [Signed home](verification-3d/rc10-signed-home.png). GitHub run `35151439348` remained in progress at local acceptance and is not counted as passed.
+
+## RC10 packages
+
+Application source: `135f8f0`. Both packages use `com.traveler.threed`, version code 11 / `1.0.0-rc10` and the existing production signing certificate. Optimized release and final lint builds pass. Signature, package ID/version, ABI sets, APK ZIP alignment, 64-bit ELF 16 KiB alignment and native/map/timezone resource contracts pass.
+
+- `My-Travel-Diary-3D-1.0.0-rc10.apk`: 89431167 bytes; SHA-256 `1ae60850916ebc4f232646a22585847166f5037c019d8921f3cd7e168906bbc7`.
+- `My-Travel-Diary-3D-1.0.0-rc10-arm64.apk`: 55917957 bytes; SHA-256 `0d32dd87fead358562b994ce859d6d010b27221aa75131c839676da886ccb777`.
 
 ---
 
