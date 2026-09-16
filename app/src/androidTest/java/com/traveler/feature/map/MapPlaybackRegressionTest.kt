@@ -22,6 +22,19 @@ import java.net.URL
 
 @RunWith(AndroidJUnit4::class)
 class MapPlaybackRegressionTest {
+    @Test fun timezoneResolutionFitsAlongsideLoadedMaps() = kotlinx.coroutines.runBlocking {
+        val context=InstrumentationRegistry.getInstrumentation().targetContext
+        BundledBasemapCache.load(context)
+        com.traveler.core.common.time.GeoTimezoneEngine.resetForTesting()
+        try {
+            for(point in listOf(GeoPoint(42.3503,-71.0810),GeoPoint(43.0896,-79.0849),
+                GeoPoint(37.5665,126.9780),GeoPoint(55.7558,37.6173),GeoPoint(62.0355,129.6755))) {
+                val result=com.traveler.core.common.time.GeoTimezoneEngine.resolve(point)
+                assertTrue("Timezone lookup failed at $point: $result",result is com.traveler.core.common.time.TimezoneResolution.Resolved)
+            }
+        } finally { com.traveler.core.common.time.GeoTimezoneEngine.releaseEngine() }
+    }
+
     @Test fun twoDAndThreeDShareTheSameRegionalCoordinateArrays() = kotlinx.coroutines.runBlocking {
         val context=InstrumentationRegistry.getInstrumentation().targetContext
         val threeD=BundledBasemapCache.load(context).first

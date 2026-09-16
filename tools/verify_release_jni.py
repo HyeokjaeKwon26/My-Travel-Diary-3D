@@ -65,6 +65,8 @@ if __name__ == "__main__":
             assert fields.get(name) == "J", f"Native long field missing or renamed: {name}"
         assert wkid is not None, "ESRI Wkid package moved away from its relative resources"
         assert "com/esri/core/geometry/gcs_tolerances.txt" in apk.namelist(), "ESRI coordinate-system data missing"
+        assert apk.read("timezone-regions.tsv").startswith(b"# TimeShape 2026b.29:"), "Regional timezone catalog missing or outdated"
+        assert "data.tar.zstd" in apk.namelist(), "Original timezone boundary data missing"
         with apk.open("assets/basemap_3d.bin") as basemap:
             assert basemap.read(8) == b"MAP3\x00\x00\x00\x01", "Bundled 3D cartography missing or invalid"
     print("Release contracts passed: native fields, ESRI resources, bundled 3D cartography")
