@@ -86,6 +86,9 @@ class PlaybackOverlayAndroidTest {
             shot.recycle()
             listOf(Color.RED,Color.BLUE,Color.YELLOW,Color.MAGENTA).all { it in colors }
         }
+        compose.waitForIdle()
+        Thread.sleep(150) // Let the display commit the aspect-driven card resize too.
+        saveScreenshot("rc7-large-font-overlay.png")
         assertTrue("Header became tall again: ${info.height/density} dp",info.height/density < 80)
     }
 
@@ -102,6 +105,32 @@ class PlaybackOverlayAndroidTest {
         saveScreenshot("rc7-date-picker.png")
         compose.onNodeWithText("Use dates").performClick()
         compose.onNodeWithText("Select travel dates").assertDoesNotExist()
+    }
+
+    @Test fun seekingToStartKeepsDateUntilPlaybackIsClosed() {
+        val prefs=context.getSharedPreferences("scene_preferences",0)
+        val previous=prefs.getBoolean("internetMaps",true)
+        prefs.edit().putBoolean("internetMaps",false).commit()
+        try {
+            val trip=com.traveler.feature.map.threed.CanyonDemo.trip()
+            val segments=trip.days.flatMap { it.items }.filterIsInstance<TripDayItem.MovementItem>().map { it.segment }
+            compose.activityRule.scenario.onActivity { activity -> activity.setContent {
+                MaterialTheme { Box(Modifier.fillMaxSize().safeDrawingPadding()) {
+                    TravelMapView(emptyList(),segments,initialPlaybackProgress=.4f,tripStartDateIso=trip.startDateIso,
+                        modifier=Modifier.fillMaxWidth().height(320.dp))
+                } }
+            } }
+            compose.onNodeWithText("2026.07.01").assertIsDisplayed()
+            compose.onNodeWithText("Day 1").assertIsDisplayed()
+            compose.onNode(SemanticsMatcher.keyIsDefined(androidx.compose.ui.semantics.SemanticsActions.SetProgress))
+                .performSemanticsAction(androidx.compose.ui.semantics.SemanticsActions.SetProgress) { it(0f) }
+            compose.onNodeWithContentDescription("Play").assertIsDisplayed()
+            compose.onNodeWithText("2026.07.01").assertIsDisplayed()
+            compose.onNodeWithText("Day 1").assertIsDisplayed()
+            compose.onNodeWithText("3D • Terrain").assertDoesNotExist()
+            compose.onNodeWithContentDescription("Exit Playback").performClick()
+            compose.onNodeWithTag("playback-date").assertDoesNotExist()
+        } finally { prefs.edit().putBoolean("internetMaps",previous).commit() }
     }
 
     @Test fun videoPhotoKeepsAllFourEdgesInPortraitAndLandscape() {
