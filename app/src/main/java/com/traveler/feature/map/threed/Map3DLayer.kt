@@ -85,8 +85,8 @@ fun Map3DLayer(model:TravelMapRenderModel,timeline:TravelStoryTimeline,state:Tra
                 .background(Color(0xDD102638),RoundedCornerShape(8.dp)).padding(8.dp))
         if(use3D) Column(Modifier.align(Alignment.BottomStart).padding(start=6.dp,bottom=68.dp)
             .background(Color(0xDD102638),RoundedCornerShape(6.dp)).padding(horizontal=6.dp,vertical=3.dp)) {
-            Text("N ↑ · $mapStatus",color=Color.White,fontSize=9.sp)
-            Text("© OpenStreetMap contributors · Natural Earth",color=Color.White,fontSize=9.sp,
+            if(!mapStatus.startsWith("Street map")) Text(mapStatus,color=Color.White,fontSize=9.sp,lineHeight=11.sp)
+            Text("N ↑ · © OpenStreetMap contributors · Natural Earth",color=Color.White,fontSize=9.sp,lineHeight=11.sp,
                 modifier=Modifier.clickable { uriHandler.openUri("https://www.openstreetmap.org/copyright") }.padding(vertical=2.dp))
         }
         TextButton(onClick={options=true},modifier=Modifier.align(Alignment.TopEnd).padding(4.dp)
