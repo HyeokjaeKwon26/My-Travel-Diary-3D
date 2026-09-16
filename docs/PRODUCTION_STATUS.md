@@ -1,3 +1,30 @@
+# 1.0.0-rc8 recorded-visit card summaries
+
+Date: 2026-09-16. Home cards previously counted a cached list of at most five named places. They now derive `방문 기록 N회` from distinct saved visit source IDs, including unnamed stops and separate returns. A source spanning multiple days is counted once. A separate `대표 장소` preview lists up to three distinct normalized recorded names plus the remaining named entries. Specific names precede Home/Work; generic-only names alongside unnamed stops produce `장소 이름 정보 부족`. Partially named journeys identify their unnamed visit count.
+
+One reactive Room query joins trips to just visit identifiers/names and durable name overrides. It observes all three tables, applies overrides to overlapping trips, and groups off the main thread. It loads no media, polyline geometry or timezone engines. The database schema and existing stored data are unchanged; no re-import is required. The derived summary is excluded from archive serialization. The legacy name cache remains for backward-compatible archives/titles but no longer supplies the home card. This counts recorded stops, not unique geographical destinations; it cannot recover visits missing from the original data.
+
+Badge rows wrap for small screens and large fonts. Long titles leave room for Delete. Maps, playback and video rendering are unchanged.
+
+## RC8 verification
+
+- 324 JVM tests passed, with no failures/errors/skips. The six new cases cover unnamed/unknown names, repeated source IDs, revisits, more than five names, normalization/order and empty trips.
+- Three targeted Android checks passed on an API 36 emulator. In-memory Room tests start with legacy Home-only caches, count eight actual records, retain zero-visit trips, observe renames across overlapping trips, compare home/detail summaries and preserve a two-day stay as one record plus a later return.
+- A 320 dp card at 150% font scale keeps distance/photo/visit badges in bounds without overlap; the delete button and representative names remain visible. Screenshot inspected: [large-font card](verification-3d/rc8-card-large-font.png).
+- Debug update over the existing production-signed installation retained the 31.2 km and 835.5 km sample journeys. Their existing records now show two and five visits respectively; distances and photo totals remain unchanged.
+- JVM/debug/instrumentation builds and lint completed successfully (0 errors, 86 warnings, 8 informational findings). GitHub Android validation, including optimized release packaging, passed for application source `bffc43b` (run `35130803993`). Physical S23 Ultra testing remains unavailable.
+
+- The final production-signed universal APK installed over the existing app without removal. Both saved journeys, distances, photo totals and corrected visit counts survived process restart and resizing from phone (1080×2400 / 420 dpi) to tablet (2560×1600 / 240 dpi) and back. Screenshots inspected: [signed phone](verification-3d/rc8-signed-home-phone.png), [signed tablet](verification-3d/rc8-signed-home-tablet.png). An external emulator System UI ANR at cold boot was dismissed before acceptance; it was not an app ANR.
+
+## RC8 packages
+
+Application source: `bffc43b`. Both packages use `com.traveler.threed`, version code 9 / `1.0.0-rc8`, and the existing production certificate. APK ZIP alignment, 64-bit ELF 16 KiB alignment, expected ABI sets and native/map/timezone resource contracts pass.
+
+- `My-Travel-Diary-3D-1.0.0-rc8.apk`: 89414779 bytes; SHA-256 `03c2c7ca2831874a75a97a3b9f66761ef594dc08a321ce345b0ac9c136300e61`. 
+- `My-Travel-Diary-3D-1.0.0-rc8-arm64.apk`: 55901569 bytes; SHA-256 `9d6aab14a6c134c6b925c1371aea96675e24cdb359d47e16200cc55d64c5dd56`. 
+
+---
+
 # 1.0.0-rc7 playback overlays and date selection
 
 Date: 2026-09-16. RC7 keeps the existing map source, terrain and camera. It adds compact playback information, a persistent actual date and calendar day number, full-aspect photos in app/video, and safe date-picker confirmation above Android navigation. The floating map options card is removed; settings move to the diary toolbar. Pausing/scrubbing at zero retains playback overlays until the user explicitly exits playback. Video title/end subtitles are fitted inside their cards.
