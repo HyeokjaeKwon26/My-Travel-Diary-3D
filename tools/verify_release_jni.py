@@ -12,7 +12,7 @@ mapping = Path(sys.argv[1] if len(sys.argv) > 1 else
                "app/build/outputs/mapping/release/mapping.txt").read_text(encoding="utf-8")
 name = "com.github.luben.zstd.ZstdInputStreamNoFinalizer"
 block = re.search(r"^" + re.escape(name) + r" -> " + re.escape(name)
-                  + r":\n(.*?)(?=^\S|\Z)", mapping, re.M | re.S)
+                  + r":\n(.*?)(?=^[^\s#]|\Z)", mapping, re.M | re.S)
 if block is None:
     raise SystemExit("Release JNI contract failed: zstd class name was changed or removed")
 for field in ("srcPos", "dstPos"):
