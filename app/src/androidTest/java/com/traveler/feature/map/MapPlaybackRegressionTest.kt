@@ -22,6 +22,15 @@ import java.net.URL
 
 @RunWith(AndroidJUnit4::class)
 class MapPlaybackRegressionTest {
+    @Test fun twoDAndThreeDShareTheSameRegionalCoordinateArrays() = kotlinx.coroutines.runBlocking {
+        val context=InstrumentationRegistry.getInstrumentation().targetContext
+        val threeD=BundledBasemapCache.load(context).first
+        val twoD=RegionalBasemapCache.ensureLoaded(context)!!
+        assertTrue(twoD.totalPoints>1000)
+        assertSame("2D must not decode and retain another regional map",threeD,twoD)
+        assertSame(threeD.polygons.first().rings.first().worldCoords,twoD.polygons.first().rings.first().worldCoords)
+    }
+
     @Test fun viewportChangesAndDisablingMapsDoNotWaitForSocketCancellation() {
         val context=InstrumentationRegistry.getInstrumentation().targetContext
         val root=File(context.cacheDir,"slow-cancel-${System.nanoTime()}").apply { mkdirs() }
