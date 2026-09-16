@@ -2,14 +2,14 @@
 
 ## New installation
 
-- Download **My-Travel-Diary-3D-1.0.0-rc2.apk** from the release page (production signing key, release optimization). This is the only installation APK distributed for RC2.
+- Download **My-Travel-Diary-3D-1.0.0-rc3.apk** from the release page (production signing key, release optimization). This is the only installation APK distributed for RC3.
 - Open the downloaded APK on your phone and allow installation from that source if Android asks.
 - Open My Travel Diary 3D and import your Timeline and photos. On Wi-Fi, the app prepares terrain around your journeys; pin a journey to keep its terrain for offline use.
 - The original 2D app (`com.traveler`) is separate and can stay installed. The 3D edition uses `com.traveler.threed`.
 
-## Updating RC1
+## Updating RC1 / RC2
 
-Install the RC2 APK directly over RC1. The application ID and signing key are unchanged and the version code increases from 2 to 3. Keep the installed app: uninstalling is unnecessary and would remove its local data. Existing journeys and terrain remain available.
+Install the RC3 APK directly over RC1 or RC2. The application ID and signing key are unchanged and the version code increases to 4. Keep the installed app: uninstalling is unnecessary and would remove its local data. Existing journeys and terrain remain available.
 
 The earlier 3D alpha had no installations or users; no alpha migration procedure is needed.
 

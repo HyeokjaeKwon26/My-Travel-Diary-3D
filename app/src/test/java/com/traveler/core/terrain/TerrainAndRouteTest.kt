@@ -78,7 +78,10 @@ class TerrainAndRouteTest {
         val model=com.traveler.feature.map.renderer.TravelMapRenderModel(emptyList(),listOf(flight))
         val timeline=com.traveler.feature.map.story.TravelStoryTimeline.build(model)
         val scene=com.traveler.feature.map.threed.SceneGeometry(model,timeline,listOf(grid()))
-        assertEquals(9512.0,(scene.routes.single().xyz[1].length()-1)*EarthGeometry.R,.01)
+        val route=scene.routes.single()
+        val midpoint=route.points.indexOfFirst { kotlin.math.abs(it.longitude-.5)<1e-8 }
+        assertTrue(midpoint>=0)
+        assertEquals(9512.0,(route.xyz[midpoint].length()-1)*EarthGeometry.R,.01)
     }
 
     @Test fun cliffDiscontinuityIsFlaggedInsteadOfAnimatingVehicleFall() {

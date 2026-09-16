@@ -1,6 +1,21 @@
-# 1.0.0-rc2 implementation and acceptance status
+# 1.0.0-rc3 implementation and acceptance status
 
-Date: 2026-09-15. Target phone: Galaxy S23 Ultra. The user could not connect the phone during this session. This release candidate can be installed and used, but it is not a declaration that every criterion in the production readiness plan has passed.
+Date: 2026-09-15 (local). Target phone: Galaxy S23 Ultra. The user could not connect the phone during this session. This release candidate can be installed and used, but it is not a declaration that every criterion in the production readiness plan has passed.
+
+## RC3 playful vehicles and flight correction
+
+The reported long flight could interpolate a straight chord inside the globe, and the previous aircraft was a nearly flat, very small triangle. Flights now sample the great-circle route and interpolate altitude independently of latitude/longitude. The vehicle nose follows the local route tangent even with a north-up camera. Altitude records and persisted journey geometry are unchanged.
+
+All nine recognized travel modes now have separate colorful solid toy forms (plus an unknown-mode pin). Size follows viewport projection instead of an arbitrarily tiny geographic size. Wheels, walking/running legs and pedaling animate; cars exaggerate measured uphill/downhill pitch, aircraft bank and bob, and boats rock. The animation is a presentation effect, deterministic from story time, shared by playback and exported video. Oversized markers retain their own depth but remain visible over terrain. The three-quarter chase camera exposes the sides and wheels; its local map window is enlarged to cover the more oblique view without increasing the texture dimensions.
+
+### RC3 verification
+
+- 300 JVM tests passed, including sparse continental and dateline flights above Earth, forward-facing direction, inside-wing banking, deterministic seeking, uphill/downhill pitch and bounded models for every mode.
+- All six Android checks passed again after the final map-window change: 33 isolated GLES vehicle poses across every mode (continental/dateline flights and north-up views included), the two cartography tests, and three app/playback/export/persistence checks. The final generated MP4 decoded completely with FFmpeg.
+- Optimized APK: 43,817,765 bytes; SHA-256 `c5fbd9ee84e9c2825e830b00eaeff661cd56845598e84c82e06e44c363b9b67a`. Production certificate matches RC1/RC2; version code 4. Packaged JNI/resource/cartography checks passed. Lint reports 0 errors and 85 warnings.
+- Installed RC3 over production-signed RC2 in the same emulator session: a saved 31.2 km fixture remained in the home list and reopened with its visits/movement. The fixture was also checked after force-stopping/relaunching RC2 before upgrading. A prior attempt spanning an emulator shutdown did not retain the seed fixture and is excluded from upgrade evidence.
+- Clean signed RC3 playback shows the enlarged car over mapped relief: [signed app](verification-3d/rc3-signed-car.png). Other actual GLES captures: [uphill](verification-3d/rc3-car-climb.png), [downhill](verification-3d/rc3-car-descent.png), [aircraft](verification-3d/rc3-airplane.png).
+- The emulator occasionally showed external System UI non-response dialogs after cold boot. Those captures are excluded; the app tests now reject a capture if such a dialog is present. Final checks passed after dismissing the external dialog. No physical S23 Ultra performance or thermal benchmark was performed.
 
 ## RC2 map correction
 
@@ -46,7 +61,7 @@ Map data uses a preprojected binary cache and one 2048×2048 local texture (16 M
 - The actual user-reported two-line route case has not been supplied. Synthetic duplicate/return/continuity tests and shared route rendering do not prove that particular case is fixed.
 - Existing timeline canonicalization and diagnostics remain in place. A comprehensive new per-point horizontal GPS-error classifier and user-facing elevation/bridge/tunnel editing are not implemented.
 - Terrain LOD is chosen per journey, not continuously refined coarse-to-fine. Raw height grids for up to 256 regions are retained on the CPU; only nearby meshes are built. Strict view-frustum culling and asynchronous mesh upload remain optimization work.
-- Heading smoothing comes from the existing common timeline. Further camera transition work for extreme gaps and mode switches remains; rewind is deterministic but is not universally cinematic.
+- The 3D vehicle/camera heading follows a sampled route tangent. Further camera transition work for extreme gaps and mode switches remains; rewind is deterministic but is not universally cinematic.
 - No road matching, detailed buildings, measured bridge deck/tunnel altitude, global terrain package, provider uptime guarantee, or photo migration across phones is claimed.
 - Full power-loss/storage-exhaustion/permission-revocation/background stress across supported Android releases remains acceptance work. Backup does not include image files, permission grants, terrain or original import files.
 

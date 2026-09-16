@@ -56,6 +56,8 @@ class ThreeDIntegrationTest {
             bitmap.recycle()
             colors.size>12
         }
+        assertFalse("A system/app non-response dialog obscures the screenshot",
+            device.hasObject(androidx.test.uiautomator.By.textContains("isn't responding")))
         device.executeShellCommand("cp ${screenshot.path} /sdcard/Download/canyon-3d-app.png")
     }
 
@@ -86,6 +88,8 @@ class ThreeDIntegrationTest {
             colors.size>30 || errors.isNotEmpty()
         }
         assertTrue(errors.joinToString(),errors.isEmpty())
+        assertFalse("A system/app non-response dialog obscures the screenshot",
+            device.hasObject(androidx.test.uiautomator.By.textContains("isn't responding")))
         val file=TravelVideoExporter.exportVideo(context,trip,model,StoryDurationProfile.SHORT,includeMusic=false)
         assertNotNull(file)
         val retriever=android.media.MediaMetadataRetriever()

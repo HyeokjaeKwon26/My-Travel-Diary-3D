@@ -17,6 +17,7 @@ data class Vec3(val x: Double, val y: Double, val z: Double) {
     fun length() = sqrt(x*x+y*y+z*z)
     fun unit() = this * (1.0 / max(1e-12, length()))
     fun cross(v: Vec3) = Vec3(y*v.z-z*v.y,z*v.x-x*v.z,x*v.y-y*v.x)
+    fun dot(v: Vec3) = x*v.x+y*v.y+z*v.z
 }
 
 /** Earth-normalized double precision on CPU, float only at the GPU boundary. */
@@ -43,6 +44,8 @@ data class SceneRoute(val episodeIndex: Int, val id: String, val startMs: Long, 
                       val xyz: List<Vec3>, val distances: List<Double>, val uncertainEdges: List<Boolean>,
                       val mode: TransportMode, val estimated: Boolean)
 
+data class SceneMotion(val position:Vec3,val forward:Vec3,val slope:Double,val turn:Double)
+
 class SceneGeometry(val model: TravelMapRenderModel, val timeline: TravelStoryTimeline, val packs: List<TerrainPack>) {
     private val terrainIndex=com.traveler.core.terrain.TerrainSpatialIndex(packs)
     fun ground(p: GeoPoint): Double? = terrainIndex.elevation(p)
@@ -57,7 +60,7 @@ class SceneGeometry(val model: TravelMapRenderModel, val timeline: TravelStoryTi
         val points = buildList {
             for (i in 0 until source.lastIndex) {
                 val d = GeodesicUtils.distanceMeters(source[i],source[i+1])
-                val steps = if (ep.segment.effectiveMode == TransportMode.AIRPLANE) 1 else
+                val steps = if (ep.segment.effectiveMode == TransportMode.AIRPLANE) ceil(d/20_000).toInt().coerceIn(1,1024) else
                     ceil(d / sampleSpacing).toInt().coerceIn(1, 128)
                 for (j in 0 until steps) add(GeodesicUtils.interpolate(source[i],source[i+1],j.toDouble()/steps))
             }
@@ -108,7 +111,43 @@ class SceneGeometry(val model: TravelMapRenderModel, val timeline: TravelStoryTi
             // never present a guessed descent as a measured journey.
             val h=max((r.xyz[i].length()-1)*EarthGeometry.R,(r.xyz[i+1].length()-1)*EarthGeometry.R)
             EarthGeometry.position(state.currentPosition,h)
-        } else r.xyz[i]*(1-f)+r.xyz[i+1]*f
+        } else interpolate(r,i,f)
+    }
+
+    private fun interpolate(r:SceneRoute,i:Int,f:Double):Vec3 {
+        if(r.mode!=TransportMode.AIRPLANE) return r.xyz[i]*(1-f)+r.xyz[i+1]*f
+        // A chord between flight fixes dives inside the globe. Interpolate geography
+        // on the sphere, with altitude separately, including when seeking backwards.
+        val geo=GeodesicUtils.interpolate(r.points[i],r.points[i+1],f)
+        val radius=r.xyz[i].length()*(1-f)+r.xyz[i+1].length()*f
+        return EarthGeometry.position(geo,(radius-1)*EarthGeometry.R)
+    }
+
+    private fun atDistance(r:SceneRoute,d:Double):Vec3 {
+        val target=d.coerceIn(0.0,r.distances.last())
+        var i=r.distances.binarySearch(target)
+        if(i<0) i=-i-2
+        i=i.coerceIn(0,r.xyz.size-2)
+        val span=r.distances[i+1]-r.distances[i]
+        return interpolate(r,i,if(span>0) ((target-r.distances[i])/span).coerceIn(0.0,1.0) else 0.0)
+    }
+
+    fun motion(state:TravelPlaybackState):SceneMotion {
+        val position=routePosition(state) ?: EarthGeometry.position(state.currentPosition,surface(state.currentPosition)+12)
+        val up=position.unit()
+        val fallback=EarthGeometry.forward(state.currentPosition,state.currentHeadingDegrees.toDouble())
+        val bracket=bracket(state) ?: return SceneMotion(position,fallback,0.0,0.0)
+        val (r,b)=bracket
+        val d=r.distances[b.first]+(r.distances[b.first+1]-r.distances[b.first])*b.second
+        val span=if(r.mode==TransportMode.AIRPLANE) 5000.0 else 150.0
+        val before=atDistance(r,d-span);val after=atDistance(r,d+span)
+        fun tangent(v:Vec3):Vec3 { val flat=v-up*v.dot(up);return if(flat.length()>1e-12) flat.unit() else fallback }
+        val forward=tangent(after-before)
+        val horizontal=((after-before)-up*(after-before).dot(up)).length()*EarthGeometry.R
+        val slope=if(uncertain(state)) 0.0 else atan2((after.length()-before.length())*EarthGeometry.R,max(1.0,horizontal))
+        val incoming=tangent(position-before);val outgoing=tangent(after-position)
+        val turn=atan2(up.dot(incoming.cross(outgoing)),incoming.dot(outgoing)).coerceIn(-1.0,1.0)
+        return SceneMotion(position,forward,slope,turn)
     }
     val overviewPoints = routes.flatMap { it.xyz }.ifEmpty { model.visits.map { EarthGeometry.position(it.location,surface(it.location)) } }
     val overviewCenter = model.focusedLocation?.let { EarthGeometry.position(it, surface(it)) } ?: overviewPoints.fold(Vec3(0.0,0.0,0.0)) { a,b -> a+b }.let {
