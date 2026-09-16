@@ -406,16 +406,32 @@ class TravelMapRenderer(
         }
     }
 
+    /** Fit the actual route for a postcard, without the live map's regional minimum zoom. */
+    fun renderOverview(canvas: Canvas, width: Int, height: Int, model: TravelMapRenderModel, insets: SafeContentInsets) {
+        val ref = prepareMap(model).viewportRef
+        val aspect = maxOf(1f, width-insets.left-insets.right) / maxOf(1f, height-insets.top-insets.bottom)
+        var sx = maxOf(.00001, ref.maxX-ref.minX) * 1.35
+        var sy = maxOf(.00001, ref.maxY-ref.minY) * 1.35
+        if (sx/sy < aspect) sx=sy*aspect else sy=sx/aspect
+        val viewport = TravelViewportCalculator(width,height,insets,ref.referenceLng,
+            (ref.minX+ref.maxX-sx)/2,(ref.minY+ref.maxY-sy)/2,sx,sy)
+        val saved=canvas.save()
+        try {
+            canvas.clipRect(0,0,width,height)
+            renderClipped(canvas,width,height,model,null,insets,viewport)
+        } finally { canvas.restoreToCount(saved) }
+    }
+
     private fun renderClipped(canvas: Canvas, width: Int, height: Int,
                               renderModel: TravelMapRenderModel, playbackState: TravelPlaybackState?,
-                              insets: SafeContentInsets) {
+                              insets: SafeContentInsets, overviewViewport: TravelViewportCalculator? = null) {
         val prepared = prepareMap(renderModel)
 
         // 1. Draw Canvas background (Water / Ocean)
         canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), bgPaint)
 
         // 2. Initialize Web Mercator Viewport with precomputed reference in O(1) time
-        val viewport = if (playbackState != null) {
+        val viewport = overviewViewport ?: if (playbackState != null) {
             TravelViewportCalculator(
                 width = width,
                 height = height,

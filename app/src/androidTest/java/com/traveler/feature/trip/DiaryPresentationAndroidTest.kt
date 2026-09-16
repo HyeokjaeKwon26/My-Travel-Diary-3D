@@ -65,7 +65,16 @@ class DiaryPresentationAndroidTest {
         } }
         compose.waitUntil(20_000) { compose.onAllNodesWithContentDescription("여행 전체 경로 지도").fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithContentDescription("여행 전체 경로 지도").assertIsDisplayed()
-        UiDevice.getInstance(InstrumentationRegistry.getInstrumentation()).takeScreenshot(File(context.getExternalFilesDir(null),"rc10-route-overview.png"))
+        val screenshot=File(context.getExternalFilesDir(null),"rc10-route-overview.png")
+        val device=UiDevice.getInstance(InstrumentationRegistry.getInstrumentation())
+        compose.waitUntil(15_000) {
+            device.takeScreenshot(screenshot)
+            val image=android.graphics.BitmapFactory.decodeFile(screenshot.path)
+            val colors=mutableSetOf<Int>()
+            for(y in image.height/12 until image.height/4 step 8) for(x in image.width/8 until image.width*7/8 step 8) colors.add(image.getPixel(x,y))
+            image.recycle()
+            colors.size>30 // The Compose image node can appear a frame before the bitmap reaches the screen.
+        }
     }
 
     @Test fun celebrationCardsRenderEveryAspectAndLongTitlesDeterministically() {

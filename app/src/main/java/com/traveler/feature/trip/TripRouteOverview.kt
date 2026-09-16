@@ -28,7 +28,7 @@ internal fun TripRouteOverview(model: TravelMapRenderModel) {
                 val renderer = TravelMapRenderer(stream)
                 RegionalBasemapCache.preparedRegionalBasemap?.let(renderer::setPreparedRegionalBasemap)
                 Bitmap.createBitmap(960, 540, Bitmap.Config.ARGB_8888).also {
-                    renderer.render(Canvas(it), 960, 540, model, null, SafeContentInsets(48f, 40f, 48f, 40f))
+                    renderer.renderOverview(Canvas(it), 960, 540, model, SafeContentInsets(48f, 40f, 48f, 40f))
                 }
             }
         }

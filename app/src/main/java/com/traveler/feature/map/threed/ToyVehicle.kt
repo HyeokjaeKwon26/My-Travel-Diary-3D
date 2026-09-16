@@ -42,6 +42,7 @@ object ToyVehicle {
                     box(0.0,.40,z,1.15,.25,2.25,ink)
                     box(0.0,.94,z,1.28,.91,2.25,white)
                     box(0.0,1.44,z,1.15,.16,2.22,white)
+                    box(0.0,1.535,z,.78,.035,2.18,blue)
                     for (x in listOf(-.65,.65)) {
                         box(x,.72,z,.025,.22,2.20,blue)
                         for (w in listOf(-.72,-.24,.24,.72)) box(x,1.14,z+w,.035,.31,.33,ink)
@@ -57,7 +58,7 @@ object ToyVehicle {
                         val q=sections[k]; val a=n*PI/6
                         return p(cos(a)*q[2],q[1]+sin(a)*q[3],q[0])
                     }
-                    val c=if(j>=6) blue else white
+                    val c=if(i>=1 || j>=6) blue else white
                     b.tri(ring(i,j),ring(i+1,j),ring(i+1,j+1),c)
                     b.tri(ring(i,j),ring(i+1,j+1),ring(i,j+1),c,.88f)
                 }
