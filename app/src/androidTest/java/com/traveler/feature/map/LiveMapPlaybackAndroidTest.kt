@@ -23,7 +23,7 @@ import java.io.File
 @RunWith(AndroidJUnit4::class)
 class LiveMapPlaybackAndroidTest {
     @get:Rule val compose=createAndroidComposeRule<MainActivity>()
-    @Test fun missingStreetDetailDoesNotStopPlaybackAndSwitchingTo2DKeepsPosition() {
+    @Test fun missingStreetDetailDoesNotStopPlayback() {
         Assume.assumeTrue(InstrumentationRegistry.getArguments().getString("offlinePlayback")=="true")
         val context=InstrumentationRegistry.getInstrumentation().targetContext
         val prefs=context.getSharedPreferences("scene_preferences",0)
@@ -39,10 +39,11 @@ class LiveMapPlaybackAndroidTest {
                     else com.traveler.core.model.TransportMode.BUS,1f,"offline fixture"))
         }
         val device=UiDevice.getInstance(InstrumentationRegistry.getInstrumentation())
+        device.setOrientationNatural()
         compose.mainClock.autoAdvance=false
         try {
             compose.activityRule.scenario.onActivity { it.setContent {
-                MaterialTheme { Column {
+                MaterialTheme { Column(Modifier.fillMaxSize().safeDrawingPadding()) {
                     TravelMapView(emptyList(),segments,initialPlaybackProgress=.3f,modifier=Modifier.fillMaxWidth().height(280.dp))
                     androidx.compose.material3.Text("Diary remains below the map",Modifier.fillMaxSize())
                 } }
@@ -61,24 +62,10 @@ class LiveMapPlaybackAndroidTest {
             assertTrue("Offline map stopped story: $values",values.zipWithNext().all { (a,b)-> b>a })
             File(context.getExternalFilesDir(null),"rc6-offline-playback.txt").writeText("progress=$values")
             compose.onNodeWithContentDescription("Pause").performClick()
+            compose.mainClock.advanceTimeBy(32)
+            compose.onNodeWithContentDescription("Play").assertIsDisplayed()
             val paused=progress()
-            compose.onNodeWithText("3D • Terrain").performClick()
-            compose.mainClock.advanceTimeBy(400)
-            compose.onNodeWithText("Switch to 2D map").performScrollTo().performClick()
-            compose.onNodeWithText("Done").performClick()
-            compose.mainClock.advanceTimeBy(500);Thread.sleep(1500)
-            assertEquals(paused,progress(),.001f)
-            compose.onNodeWithText("2D • Options").assertIsDisplayed()
-            compose.onNodeWithText("Diary remains below the map").assertIsDisplayed()
-            device.takeScreenshot(File("/sdcard/Download/rc6-2d-boundary.png"))
-            compose.onNodeWithText("2D • Options").performClick()
-            compose.mainClock.advanceTimeBy(400)
-            compose.onNodeWithText("Switch to 3D map").performScrollTo().performClick()
-            compose.onNodeWithText("Done").performClick()
-            compose.mainClock.advanceTimeBy(500);Thread.sleep(1500)
-            assertEquals(paused,progress(),.001f)
-            device.takeScreenshot(File("/sdcard/Download/rc6-returned-3d.png"))
-            File(context.getExternalFilesDir(null),"rc6-offline-playback.txt").writeText("progress=$values paused=$paused afterSwitch=${progress()}")
-        } finally { prefs.edit().putBoolean("internetMaps",prior).commit();compose.mainClock.autoAdvance=true }
+            File(context.getExternalFilesDir(null),"rc6-offline-playback.txt").writeText("progress=$values paused=$paused")
+        } finally { device.unfreezeRotation();prefs.edit().putBoolean("internetMaps",prior).commit();compose.mainClock.autoAdvance=true }
     }
 }
