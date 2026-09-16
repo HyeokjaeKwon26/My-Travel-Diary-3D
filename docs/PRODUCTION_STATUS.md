@@ -20,8 +20,8 @@ Badge rows wrap for small screens and large fonts. Long titles leave room for De
 
 Application source: `bffc43b`. Both packages use `com.traveler.threed`, version code 9 / `1.0.0-rc8`, and the existing production certificate. APK ZIP alignment, 64-bit ELF 16 KiB alignment, expected ABI sets and native/map/timezone resource contracts pass.
 
-- `My-Travel-Diary-3D-1.0.0-rc8.apk`: 89414779 bytes; SHA-256 `03c2c7ca2831874a75a97a3b9f66761ef594dc08a321ce345b0ac9c136300e61`. 
-- `My-Travel-Diary-3D-1.0.0-rc8-arm64.apk`: 55901569 bytes; SHA-256 `9d6aab14a6c134c6b925c1371aea96675e24cdb359d47e16200cc55d64c5dd56`. 
+- `My-Travel-Diary-3D-1.0.0-rc8.apk`: 89414779 bytes; SHA-256 `03c2c7ca2831874a75a97a3b9f66761ef594dc08a321ce345b0ac9c136300e61`.
+- `My-Travel-Diary-3D-1.0.0-rc8-arm64.apk`: 55901569 bytes; SHA-256 `9d6aab14a6c134c6b925c1371aea96675e24cdb359d47e16200cc55d64c5dd56`.
 
 ---
 
