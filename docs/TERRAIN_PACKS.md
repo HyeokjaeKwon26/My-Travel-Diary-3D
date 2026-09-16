@@ -1,7 +1,24 @@
 # Offline terrain packs
 
-The Android app does not request INTERNET permission. Terrain is loaded from bundled
-or user-imported files; location history is never sent to an elevation service.
+The app automatically downloads public Mapzen Terrarium tiles over HTTPS for ground
+travel corridors and visits. Wi-Fi is the default; mobile data requires selection.
+Whole Timeline files and photos are never uploaded, but the provider sees tile
+regions and the connection IP. Downloaded grids are shared between journeys.
+
+Storage defaults to 200 MB, adjustable to 100/200/500 MB. Pin a journey with
+**Keep this journey offline** to protect it from automatic eviction. Unpinned
+regions are removed oldest-first. Downloads resume at verified tile boundaries.
+Clear temporary terrain pauses the current journey before removing unpinned tiles.
+
+A trip uses at most 256 tiles (zoom 12 down to 7 for long routes), resampled to
+65×65 signed metre grids with missing values preserved, GZIP and SHA-256 validation.
+Source tile responses are capped at 1 MB; decoded PNGs must be 256×256. A single
+checksum detects local corruption, not malicious replacement by a trusted provider.
+Tile borders are averaged; GPS height is not mixed into a partially covered DEM route.
+Terrain is frozen while playing and refreshed when paused. Export takes a disk snapshot.
+
+Bundled/imported grids are the fallback when no downloaded grids are present;
+they are not layered over a partial automatic set, avoiding conflicting meshes.
 
 The bundled **Grand Canyon South Rim** grid uses real elevation samples from
 [Mapzen Terrain Tiles on AWS](https://registry.opendata.aws/terrain-tiles/),
@@ -16,7 +33,7 @@ World artwork is rendered from the existing Natural Earth public-domain polygons
 
 ## Import
 
-Open a trip → **3D • Terrain** → **Import terrain pack**. Pick a `.terrain.json`
+Open a trip → **3D • Terrain** → **Advanced: import terrain file**. Pick a `.terrain.json`
 file. The bundled region and up to three imported regional grids are held locally.
 Imported packs can be removed from the same dialog. Original trips are not removed.
 
@@ -51,7 +68,7 @@ python tools/build_3d_assets.py --bounds NORTH SOUTH WEST EAST --name "Region" -
 ```
 
 This **developer-side command uses the internet** to download public elevation
-tiles. The app itself remains offline. Review the source-specific attribution
+tiles. Review the source-specific attribution
 before redistributing a region outside the United States. The builder records
 source tile URLs and SHA-256 hashes next to the output.
 

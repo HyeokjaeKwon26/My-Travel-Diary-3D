@@ -3,12 +3,10 @@ package com.traveler.feature.video
 import android.content.Context
 import android.media.*
 import android.view.Surface
-import com.traveler.R
 import com.traveler.feature.map.story.TravelStoryTimeline
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.ensureActive
-import java.io.ByteArrayOutputStream
 import java.io.File
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
@@ -22,7 +20,7 @@ import java.util.concurrent.atomic.AtomicBoolean
  *
  * Invariants:
  * 1. 100% Offline: Zero network calls, zero external binary dependencies.
- * 2. Real Soundtrack: Muxes bundled traveler_memories.wav as AAC audio track when enabled.
+ * 2. Real Soundtrack: Muxes bundled traveler_memories.m4a as AAC audio track when enabled.
  * 3. Deterministic Frame Timestamps: Monotonic frame PTS advances at exact frame intervals.
  * 4. Clean Cancellation: Stopping or cancelling immediately cleans up partial files.
  */
@@ -67,6 +65,7 @@ class TravelVideoEncoder(
         var codecInputSurface: CodecInputSurface? = null
         var reusableBitmap: android.graphics.Bitmap? = null
         var muxer: MediaMuxer? = null
+        var soundtrack: StreamingSoundtrack? = null
         var isMuxerStarted = false
         var videoTrackIndex = -1
         var audioTrackIndex = -1
@@ -91,32 +90,16 @@ class TravelVideoEncoder(
             videoEncoder.start()
 
             // 2. Configure Audio Encoder (AAC) if includeMusic is true
-            var pcmRawBytes: ByteArray? = null
             if (includeMusic) {
-                pcmRawBytes = context.resources.openRawResource(R.raw.traveler_memories).use { raw ->
-                    val input = java.io.DataInputStream(raw)
-                    val header = ByteArray(44)
-                    input.readFully(header)
-                    check(String(header, 0, 4, Charsets.US_ASCII) == "RIFF" &&
-                        String(header, 36, 4, Charsets.US_ASCII) == "data") { "Unsupported bundled WAV header" }
-                    val fields = ByteBuffer.wrap(header).order(ByteOrder.LITTLE_ENDIAN)
-                    check(fields.getShort(20).toInt() == 1 && fields.getShort(22).toInt() == 2 &&
-                        fields.getInt(24) == 44100 && fields.getShort(34).toInt() == 16) { "Unsupported bundled PCM format" }
-                    val size = fields.getInt(40)
-                    check(size in 4..40_000_000 && size % 4 == 0) { "Invalid WAV data size" }
-                    ByteArray(size).also { input.readFully(it) }
+                soundtrack=StreamingSoundtrack(context)
+                val audioFormat=MediaFormat.createAudioFormat(MediaFormat.MIMETYPE_AUDIO_AAC,44100,2).apply {
+                    setInteger(MediaFormat.KEY_AAC_PROFILE,MediaCodecInfo.CodecProfileLevel.AACObjectLC)
+                    setInteger(MediaFormat.KEY_BIT_RATE,128_000)
+                    setInteger(MediaFormat.KEY_MAX_INPUT_SIZE,16384)
                 }
-
-                if (pcmRawBytes != null && pcmRawBytes.isNotEmpty()) {
-                    val audioFormat = MediaFormat.createAudioFormat(MediaFormat.MIMETYPE_AUDIO_AAC, 44100, 2).apply {
-                        setInteger(MediaFormat.KEY_AAC_PROFILE, MediaCodecInfo.CodecProfileLevel.AACObjectLC)
-                        setInteger(MediaFormat.KEY_BIT_RATE, 128_000) // 128 kbps
-                        setInteger(MediaFormat.KEY_MAX_INPUT_SIZE, 16384)
-                    }
-                    audioEncoder = MediaCodec.createEncoderByType(MediaFormat.MIMETYPE_AUDIO_AAC)
-                    audioEncoder.configure(audioFormat, null, null, MediaCodec.CONFIGURE_FLAG_ENCODE)
-                    audioEncoder.start()
-                }
+                audioEncoder=MediaCodec.createEncoderByType(MediaFormat.MIMETYPE_AUDIO_AAC)
+                audioEncoder.configure(audioFormat,null,null,MediaCodec.CONFIGURE_FLAG_ENCODE)
+                audioEncoder.start()
             }
 
             // 3. Initialize MediaMuxer
@@ -128,8 +111,8 @@ class TravelVideoEncoder(
             val totalAudioSamples = (totalDurationSeconds * 44100.0).toLong()
             val fadeOutStartSample = maxOf(0L, totalAudioSamples - (2.0 * 44100).toLong())
             var audioSamplesFed = 0L
-            var audioPcmOffset = 0
             var isAudioEosSignaled = (audioEncoder == null)
+            var audioOutputEnded = (audioEncoder == null)
 
             fun flushPendingSamplesIfReady() {
                 val needAudio = (audioEncoder != null)
@@ -181,38 +164,30 @@ class TravelVideoEncoder(
                                 )
                             }
                         }
+                        if(aBufferInfo.flags and MediaCodec.BUFFER_FLAG_END_OF_STREAM != 0) audioOutputEnded=true
                         enc.releaseOutputBuffer(aOutIdx, false)
                     }
                     aOutIdx = enc.dequeueOutputBuffer(aBufferInfo, 0L)
                 }
             }
 
-            fun feedAudioInput() {
+            fun feedAudioInput(targetSamples:Long = totalAudioSamples) {
                 val enc = audioEncoder ?: return
-                val pcm = pcmRawBytes ?: return
+                val pcm = soundtrack ?: return
                 if (isAudioEosSignaled) return
 
-                while (audioSamplesFed < totalAudioSamples) {
+                while (audioSamplesFed < minOf(totalAudioSamples,targetSamples)) {
+                    coroutineContext.ensureActive()
                     val inIdx = enc.dequeueInputBuffer(0L)
                     if (inIdx < 0) break
 
                     val inputBuf = enc.getInputBuffer(inIdx) ?: break
                     inputBuf.clear()
 
-                    val maxChunkBytes = minOf(inputBuf.capacity(), 4096, ((totalAudioSamples - audioSamplesFed) * 4).toInt())
+                    val maxChunkBytes = minOf(inputBuf.capacity(), 4096, ((totalAudioSamples - audioSamplesFed) * 4).coerceAtMost(4096L).toInt())
                     val chunkBytes = ByteArray(maxChunkBytes)
-                    var filled = 0
-
-                    while (filled < maxChunkBytes && audioSamplesFed < totalAudioSamples) {
-                        val availInPcm = pcm.size - audioPcmOffset
-                        val toCopy = minOf(availInPcm, maxChunkBytes - filled)
-                        System.arraycopy(pcm, audioPcmOffset, chunkBytes, filled, toCopy)
-                        filled += toCopy
-                        audioPcmOffset += toCopy
-                        if (audioPcmOffset >= pcm.size) {
-                            audioPcmOffset = 0 // Loop audio cleanly
-                        }
-                    }
+                    pcm.read(chunkBytes)
+                    val filled=chunkBytes.size
 
                     val samplesInChunk = filled / 4 // 16-bit stereo = 4 bytes per sample
                     val chunkShorts = ShortArray(filled / 2)
@@ -260,7 +235,7 @@ class TravelVideoEncoder(
 
                 // Feed and drain audio
                 if (audioEncoder != null) {
-                    feedAudioInput()
+                    feedAudioInput(((storyTimeSeconds+1.0)*44100).toLong())
                     drainAudioEncoder(false)
                 }
 
@@ -305,8 +280,12 @@ class TravelVideoEncoder(
 
             // 5. Signal End-of-Stream to Video Encoder & Drain EOS
             videoEncoder.signalEndOfInputStream()
+            val videoDeadline=System.nanoTime()+15_000_000_000L
             var isVideoEos = false
             while (!isVideoEos) {
+                coroutineContext.ensureActive()
+                if(isCancelled.get()) throw InterruptedException("Video encoding cancelled")
+                check(System.nanoTime()<videoDeadline) { "Video encoder did not finish" }
                 val outIndex = videoEncoder.dequeueOutputBuffer(vBufferInfo, 20_000L)
                 if (outIndex >= 0) {
                     if ((vBufferInfo.flags and MediaCodec.BUFFER_FLAG_END_OF_STREAM) != 0) {
@@ -321,26 +300,23 @@ class TravelVideoEncoder(
                         }
                     }
                     videoEncoder.releaseOutputBuffer(outIndex, false)
-                } else if (outIndex == MediaCodec.INFO_TRY_AGAIN_LATER) {
-                    break
+                } else if (outIndex == MediaCodec.INFO_OUTPUT_FORMAT_CHANGED && videoTrackIndex<0) {
+                    videoTrackIndex=muxer.addTrack(videoEncoder.outputFormat);flushPendingSamplesIfReady()
                 }
             }
 
             // 6. Drain remaining Audio EOS
             if (audioEncoder != null) {
-                if (!isAudioEosSignaled) {
-                    val inIdx = audioEncoder.dequeueInputBuffer(10_000L)
-                    if (inIdx >= 0) {
-                        audioEncoder.queueInputBuffer(inIdx, 0, 0, 0L, MediaCodec.BUFFER_FLAG_END_OF_STREAM)
-                        isAudioEosSignaled = true
-                    }
-                }
-                var isAudioEos = false
-                while (!isAudioEos) {
+                val audioDeadline=System.nanoTime()+15_000_000_000L
+                while (!audioOutputEnded) {
+                    coroutineContext.ensureActive()
+                    check(System.nanoTime()<audioDeadline) { "Audio encoder did not finish" }
+                    if(isCancelled.get()) throw InterruptedException("Video encoding cancelled")
+                    if(!isAudioEosSignaled) feedAudioInput()
                     val outIndex = audioEncoder.dequeueOutputBuffer(aBufferInfo, 20_000L)
                     if (outIndex >= 0) {
                         if ((aBufferInfo.flags and MediaCodec.BUFFER_FLAG_END_OF_STREAM) != 0) {
-                            isAudioEos = true
+                            audioOutputEnded = true
                         }
                         val encodedData = audioEncoder.getOutputBuffer(outIndex)
                         if (encodedData != null && (aBufferInfo.flags and MediaCodec.BUFFER_FLAG_CODEC_CONFIG) == 0 && aBufferInfo.size != 0) {
@@ -351,12 +327,15 @@ class TravelVideoEncoder(
                             }
                         }
                         audioEncoder.releaseOutputBuffer(outIndex, false)
-                    } else if (outIndex == MediaCodec.INFO_TRY_AGAIN_LATER) {
-                        break
+                    } else if(outIndex==MediaCodec.INFO_OUTPUT_FORMAT_CHANGED && audioTrackIndex<0) {
+                        audioTrackIndex=muxer.addTrack(audioEncoder.outputFormat);flushPendingSamplesIfReady()
                     }
                 }
             }
 
+            check(isMuxerStarted) { "No video frames were encoded" }
+            muxer.stop()
+            isMuxerStarted=false
             true
         } catch (e: Exception) {
             if (outputFile.exists()) {
@@ -368,6 +347,7 @@ class TravelVideoEncoder(
                 throw e
             }
         } finally {
+            runCatching { soundtrack?.close() }
             try {
                 if (isMuxerStarted) {
                     muxer?.stop()

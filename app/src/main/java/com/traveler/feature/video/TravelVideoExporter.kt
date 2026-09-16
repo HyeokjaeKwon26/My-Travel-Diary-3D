@@ -86,6 +86,7 @@ object TravelVideoExporter {
         renderModel: TravelMapRenderModel,
         profile: StoryDurationProfile,
         includeMusic: Boolean = true,
+        resolution: VideoResolution = VideoResolution.FULL_HD,
         generalizeHomeAddress: Boolean = true,
         encoderRef: ((TravelVideoEncoder) -> Unit)? = null,
         onProgress: ((Float) -> Unit)? = null
@@ -93,7 +94,7 @@ object TravelVideoExporter {
         val safeModel = if (generalizeHomeAddress) com.traveler.feature.video.ExportPrivacy.generalize(renderModel) else renderModel
         val safeTrip = if (generalizeHomeAddress) trip.copy(title = com.traveler.feature.video.ExportPrivacy.label(trip.title)) else trip
         val timeline = buildExportTimeline(safeTrip, safeModel, profile)
-        val terrain = com.traveler.core.terrain.TerrainRepository.load(context)
+        val terrain = com.traveler.core.terrain.JourneyTerrain.load(context,renderModel)
         val basemapStream = context.assets.open("basemap_world.json")
         val renderer = TravelVideoRenderer(
             context = context,
@@ -114,10 +115,11 @@ object TravelVideoExporter {
         )
         encoderRef?.invoke(encoder)
 
+        val actualResolution=resolution.supportedOrFallback()
         val success = encoder.encodeToMp4(
             outputFile = tempFile,
-            width = 1080,
-            height = 1920,
+            width = actualResolution.width,
+            height = actualResolution.height,
             fps = 30,
             includeMusic = includeMusic,
             onProgress = onProgress

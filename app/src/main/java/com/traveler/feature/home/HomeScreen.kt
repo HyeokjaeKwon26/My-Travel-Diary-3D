@@ -22,6 +22,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.traveler.core.model.Trip
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -31,6 +32,18 @@ fun HomeScreen(
     onNavigateToTripDetail: (String) -> Unit
 ) {
     val trips by viewModel.trips.collectAsState()
+    val context=androidx.compose.ui.platform.LocalContext.current
+    val scope=rememberCoroutineScope()
+    val restore=androidx.activity.compose.rememberLauncherForActivityResult(androidx.activity.result.contract.ActivityResultContracts.OpenDocument()) { uri ->
+        if(uri!=null) scope.launch {
+            try {
+                val id=com.traveler.core.terrain.TripArchive.restore(context,uri)
+                android.widget.Toast.makeText(context,"Journey restored. Allow photo access to reconnect your gallery.",android.widget.Toast.LENGTH_LONG).show()
+                onNavigateToTripDetail(id)
+            } catch(e:kotlinx.coroutines.CancellationException) { throw e }
+            catch(e:Exception) { android.widget.Toast.makeText(context,e.message ?: "Could not restore journey",android.widget.Toast.LENGTH_LONG).show() }
+        }
+    }
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
@@ -41,15 +54,14 @@ fun HomeScreen(
                         Text(
                             text = "My Travel Diary 3D",
                             fontWeight = FontWeight.Bold,
-                            fontSize = 22.sp
+                            fontSize = 20.sp,
+                            maxLines = 1,
+                            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
                         )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            text = "✈️ 🌍",
-                            fontSize = 18.sp
-                        )
+
                     }
                 },
+                actions = { TextButton(onClick={restore.launch(arrayOf("application/json","application/octet-stream"))}) { Text("Restore") } },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = MaterialTheme.colorScheme.surface
                 )

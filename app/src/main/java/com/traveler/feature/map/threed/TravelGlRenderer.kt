@@ -22,7 +22,7 @@ class TravelGlRenderer(private val context: Context, val scene: SceneGeometry) {
     private val matrix = FloatArray(16)
     private data class Mesh(val data: FloatBuffer, val count: Int)
     private var world: Mesh? = null
-    private var terrain = emptyList<Mesh>()
+    private val terrain = linkedMapOf<Int,Mesh>()
     private var routes = emptyList<Mesh>()
     private val vehicleBuffer = ByteBuffer.allocateDirect(256 * 36).order(ByteOrder.nativeOrder()).asFloatBuffer()
     private var positionAttribute=0; private var colorAttribute=0; private var uvAttribute=0
@@ -58,34 +58,6 @@ class TravelGlRenderer(private val context: Context, val scene: SceneGeometry) {
             GLUtils.texImage2D(GL.GL_TEXTURE_2D,0,bmp,0); bmp.recycle()
         }
         world=buildWorld()
-        terrain=scene.packs.map { pack ->
-            val values=ArrayList<Float>()
-            // Bound mesh size even for a maximum-size imported pack.
-            val step=max(1,(max(pack.rows,pack.columns)-1)/128)
-            for(r in 0 until pack.rows-1 step step) for(c in 0 until pack.columns-1 step step) {
-                val r1=min(pack.rows-1,r+step); val c1=min(pack.columns-1,c+step)
-                fun p(y:Int,x:Int): Pair<GeoPoint,Double>? {
-                    val h=pack.heights[y*pack.columns+x] ?: return null
-                    return GeoPoint(pack.north-(pack.north-pack.south)*y/(pack.rows-1),
-                        pack.west+(pack.east-pack.west)*x/(pack.columns-1)) to h
-                }
-                val a=p(r,c) ?: continue; val b=p(r1,c) ?: continue
-                val d=p(r,c1) ?: continue; val e=p(r1,c1) ?: continue
-                fun triangle(ps:List<Pair<GeoPoint,Double>>) {
-                    val xyz=ps.map { EarthGeometry.position(it.first,it.second) }
-                    var normal=(xyz[1]-xyz[0]).cross(xyz[2]-xyz[0]).unit()
-                    if(normal.x*xyz[0].x+normal.y*xyz[0].y+normal.z*xyz[0].z<0) normal=normal*-1.0
-                    val light=Vec3(-.3,.8,-.5).unit()
-                    val shade=(.5+.5*abs(normal.x*light.x+normal.y*light.y+normal.z*light.z)).toFloat()
-                    ps.forEachIndexed { i,ph ->
-                        val t=((ph.second-650)/2200).coerceIn(0.0,1.0).toFloat()
-                        vertex(values,xyz[i],floatArrayOf((.65f-.22f*t)*shade,(.34f+.2f*t)*shade,(.22f+.12f*t)*shade,1f))
-                    }
-                }
-                triangle(listOf(a,b,d)); triangle(listOf(d,b,e))
-            }
-            mesh(values)
-        }
         routes=scene.routes.map { route ->
             val values=ArrayList<Float>()
             val color=if(route.mode==TransportMode.AIRPLANE) floatArrayOf(.74f,.64f,1f,1f) else floatArrayOf(.25f,.94f,.89f,1f)
@@ -122,7 +94,13 @@ class TravelGlRenderer(private val context: Context, val scene: SceneGeometry) {
         val distance=if(state==null) scene.overviewDistance else if(flight)
             (state.cameraSpanLat*111000/EarthGeometry.R*1.3).coerceIn(.04,2.8) else
             (state.cameraSpanLat*111000/EarthGeometry.R).coerceIn(.0008,.006)
-        val eye=focus+up*(distance*.8)-forward*(distance*.7)
+        var eye=focus+up*(distance*.8)-forward*(distance*.7)
+        if(distance<.1) {
+            val radial=eye.unit()
+            val eyePoint=GeoPoint(Math.toDegrees(asin(radial.y)),Math.toDegrees(atan2(radial.z,radial.x)))
+            val floor=scene.ground(eyePoint)
+            if(floor!=null && (eye.length()-1)*EarthGeometry.R<floor+200) eye=radial*(1+(floor+200)/EarthGeometry.R)
+        }
         val target=focus+forward*(distance*.10)
         Matrix.setLookAtM(view,0,eye.x.toFloat(),eye.y.toFloat(),eye.z.toFloat(),target.x.toFloat(),target.y.toFloat(),target.z.toFloat(),up.x.toFloat(),up.y.toFloat(),up.z.toFloat())
         Matrix.perspectiveM(projection,0,42f,width.toFloat()/max(1,height),max(.000001,distance/8).toFloat(),(if(distance<.1) max(.03,distance*8) else distance+3).toFloat())
@@ -130,7 +108,16 @@ class TravelGlRenderer(private val context: Context, val scene: SceneGeometry) {
         GL.glUseProgram(program); GL.glUniformMatrix4fv(matrixUniform,1,false,matrix,0)
         GL.glActiveTexture(GL.GL_TEXTURE0); GL.glBindTexture(GL.GL_TEXTURE_2D,texture); GL.glUniform1i(textureUniform,0)
         world?.let { draw(it,GL.GL_TRIANGLES,1f,true) }
-        if(distance<.1) terrain.forEach { draw(it,GL.GL_TRIANGLES) }
+        if(distance<.1) {
+            val center=GeoPoint(Math.toDegrees(asin(up.y)),Math.toDegrees(atan2(up.z,up.x)))
+            val nearby=scene.packs.indices.sortedBy { i ->
+                val p=scene.packs[i]
+                com.traveler.core.common.geo.GeodesicUtils.distanceMeters(center,
+                    GeoPoint(center.latitude.coerceIn(p.south,p.north),center.longitude.coerceIn(p.west,p.east)))
+            }.take(12).toSet()
+            terrain.keys.toList().filter { it !in nearby }.forEach { terrain.remove(it) }
+            for(i in nearby) draw(terrain.getOrPut(i) { buildTerrain(scene.packs[i]) },GL.GL_TRIANGLES)
+        }
         // Do not show future / return paths over the current journey during playback.
         routes.forEachIndexed { i,mesh ->
             val r=scene.routes[i]
@@ -181,6 +168,35 @@ class TravelGlRenderer(private val context: Context, val scene: SceneGeometry) {
         GL.glDisable(GL.GL_DEPTH_TEST)
     }
 
+    private fun buildTerrain(pack:com.traveler.core.terrain.TerrainPack):Mesh {
+            val values=ArrayList<Float>()
+            // Bound mesh size even for a maximum-size imported pack.
+            val step=max(1,(max(pack.rows,pack.columns)-1)/128)
+            for(r in 0 until pack.rows-1 step step) for(c in 0 until pack.columns-1 step step) {
+                val r1=min(pack.rows-1,r+step); val c1=min(pack.columns-1,c+step)
+                fun p(y:Int,x:Int): Pair<GeoPoint,Double>? {
+                    val h=pack.heights[y*pack.columns+x] ?: return null
+                    return GeoPoint(pack.north-(pack.north-pack.south)*y/(pack.rows-1),
+                        pack.west+(pack.east-pack.west)*x/(pack.columns-1)) to h
+                }
+                val a=p(r,c) ?: continue; val b=p(r1,c) ?: continue
+                val d=p(r,c1) ?: continue; val e=p(r1,c1) ?: continue
+                fun triangle(ps:List<Pair<GeoPoint,Double>>) {
+                    val xyz=ps.map { EarthGeometry.position(it.first,it.second) }
+                    var normal=(xyz[1]-xyz[0]).cross(xyz[2]-xyz[0]).unit()
+                    if(normal.x*xyz[0].x+normal.y*xyz[0].y+normal.z*xyz[0].z<0) normal=normal*-1.0
+                    val light=Vec3(-.3,.8,-.5).unit()
+                    val shade=(.5+.5*abs(normal.x*light.x+normal.y*light.y+normal.z*light.z)).toFloat()
+                    ps.forEachIndexed { i,ph ->
+                        val t=((ph.second-650)/2200).coerceIn(0.0,1.0).toFloat()
+                        vertex(values,xyz[i],floatArrayOf((.65f-.22f*t)*shade,(.34f+.2f*t)*shade,(.22f+.12f*t)*shade,1f))
+                    }
+                }
+                triangle(listOf(a,b,d)); triangle(listOf(d,b,e))
+            }
+            return mesh(values)
+    }
+
     private fun draw(m:Mesh,mode:Int,alpha:Float=1f,textured:Boolean=false) {
         if(m.count==0) return
         GL.glUniform1f(useTextureUniform,if(textured) 1f else 0f);GL.glUniform1f(alphaUniform,alpha)
@@ -211,5 +227,5 @@ class TravelGlRenderer(private val context: Context, val scene: SceneGeometry) {
         val status=IntArray(1);GL.glGetShaderiv(id,GL.GL_COMPILE_STATUS,status,0)
         check(status[0]!=0) { GL.glGetShaderInfoLog(id) };return id
     }
-    fun release() { if(program!=0) GL.glDeleteProgram(program);if(texture!=0) GL.glDeleteTextures(1,intArrayOf(texture),0);program=0;texture=0 }
+    fun release() { terrain.clear();routes=emptyList();world=null;if(program!=0) GL.glDeleteProgram(program);if(texture!=0) GL.glDeleteTextures(1,intArrayOf(texture),0);program=0;texture=0 }
 }

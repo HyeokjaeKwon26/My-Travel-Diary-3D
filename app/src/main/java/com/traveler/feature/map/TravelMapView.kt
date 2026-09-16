@@ -191,7 +191,7 @@ fun TravelMapView(
         // clipping layer covers its separate GPU surface on some Android versions.
         modifier = modifier
     ) {
-        com.traveler.feature.map.threed.Map3DLayer(renderModel, storyTimeline, currentActiveState) {
+        com.traveler.feature.map.threed.Map3DLayer(renderModel, storyTimeline, currentActiveState, isPlaying) {
     LaunchedEffect(Unit) {
         if (!RegionalBasemapCache.isReady) {
             val prep = RegionalBasemapCache.ensureLoaded(context.applicationContext)
