@@ -18,10 +18,10 @@ jobs:
       - name: Install Android SDK platform
         run: |
           "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" 'platforms;android-36' 'build-tools;35.0.0' >/dev/null
-      - name: Unit tests, APK and lint
+      - name: Unit tests, debug/release APK and lint
         run: |
           chmod +x gradlew
-          ./gradlew testDebugUnitTest assembleDebug lintDebug --console=plain
+          ./gradlew testDebugUnitTest assembleDebug assembleRelease lintDebug --console=plain
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         if: always()
         with:

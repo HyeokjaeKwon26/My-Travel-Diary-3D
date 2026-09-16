@@ -1,3 +1,5 @@
+> Historical alpha validation. Current implementation and acceptance status: [PRODUCTION_STATUS.md](PRODUCTION_STATUS.md).
+
 # 3D alpha implementation status
 
 Date: 2026-09-15. Version: 0.1.0-alpha. Original baseline: `9bcfb4fd81281f54d85cfb1173897d391508c59e`.

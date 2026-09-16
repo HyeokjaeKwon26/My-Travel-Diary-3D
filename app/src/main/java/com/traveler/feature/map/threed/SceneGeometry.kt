@@ -43,10 +43,13 @@ data class SceneRoute(val episodeIndex: Int, val id: String, val startMs: Long, 
                       val mode: TransportMode, val estimated: Boolean)
 
 class SceneGeometry(val model: TravelMapRenderModel, val timeline: TravelStoryTimeline, val packs: List<TerrainPack>) {
-    fun ground(p: GeoPoint): Double? = packs.firstNotNullOfOrNull { it.meshElevation(p) }
+    private val terrainIndex=com.traveler.core.terrain.TerrainSpatialIndex(packs)
+    fun ground(p: GeoPoint): Double? = terrainIndex.elevation(p)
     // Use a single DEM datum for terrain attachment. Recorded GPS height is never
     // silently mixed with DEM height or overwritten in the persisted journey.
     fun surface(p: GeoPoint) = ground(p) ?: p.altitudeMeters ?: 0.0
+    private val sampleSpacing=max(50.0,timeline.episodes.filterIsInstance<StoryEpisode.MovementEpisode>()
+        .filter { it.segment.effectiveMode!=TransportMode.AIRPLANE }.sumOf { it.totalDistanceMeters }/50_000.0)
     val routes = timeline.episodes.mapIndexedNotNull { episodeIndex, episode ->
         val ep = episode as? StoryEpisode.MovementEpisode ?: return@mapIndexedNotNull null
         val source = ep.pathPoints
@@ -54,7 +57,7 @@ class SceneGeometry(val model: TravelMapRenderModel, val timeline: TravelStoryTi
             for (i in 0 until source.lastIndex) {
                 val d = GeodesicUtils.distanceMeters(source[i],source[i+1])
                 val steps = if (ep.segment.effectiveMode == TransportMode.AIRPLANE) 1 else
-                    ceil(d / 50.0).toInt().coerceIn(1, 128)
+                    ceil(d / sampleSpacing).toInt().coerceIn(1, 128)
                 for (j in 0 until steps) add(GeodesicUtils.interpolate(source[i],source[i+1],j.toDouble()/steps))
             }
             if (source.isNotEmpty()) add(source.last())
@@ -64,16 +67,21 @@ class SceneGeometry(val model: TravelMapRenderModel, val timeline: TravelStoryTi
             if (i > 0) distance += GeodesicUtils.distanceMeters(points[i-1], p)
             distance
         }
-        val heights = points.map { surface(it) }
+        val dem=points.map { ground(it) }
+        val known=if(dem.any { it!=null }) dem else points.map { it.altitudeMeters }
+        var lastHeight=known.firstOrNull { it!=null } ?: 0.0
+        val heights=known.map { h -> if(h!=null) lastHeight=h;lastHeight }
+        val hasHeight=known.any { it!=null }
         val uncertain = points.zipWithNext().mapIndexed { i,_ ->
             ep.segment.effectiveMode != TransportMode.AIRPLANE &&
-                abs(heights[i+1] - heights[i]) > max(75.0, (distances[i+1] - distances[i]) * .55)
+                ((hasHeight && (known[i]==null || known[i+1]==null)) ||
+                    abs(heights[i+1] - heights[i]) > max(75.0, (distances[i+1] - distances[i]) * .55))
         }
         val xyz = points.mapIndexed { i,p ->
             val lift = if (ep.segment.effectiveMode == TransportMode.AIRPLANE && p.altitudeMeters == null)
                 sin(PI*distances[i]/max(1.0,distance))*min(600_000.0,max(12_000.0,ep.totalDistanceMeters*.05)) else 0.0
             val height=if(ep.segment.effectiveMode==TransportMode.AIRPLANE) p.altitudeMeters ?: (surface(p)+lift)
-                else surface(p)
+                else heights[i]
             EarthGeometry.position(p, height+12)
         }
         SceneRoute(episodeIndex,ep.segment.id,ep.startTimestampEpochMs,ep.endTimestampEpochMs,points,xyz,distances,uncertain,

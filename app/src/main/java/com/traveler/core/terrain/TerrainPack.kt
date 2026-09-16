@@ -26,7 +26,7 @@ data class TerrainPack(
         require(name.isNotBlank() && name.length <= 120 && attribution.isNotBlank() && attribution.length <= 2000)
         require(verticalDatum.isNotBlank() && verticalDatum.length <= 120)
         require(north.isFinite() && south.isFinite() && east.isFinite() && west.isFinite())
-        require(south >= -85 && north <= 85 && north > south && west >= -180 && east <= 180 && east > west)
+        require(south >= -85.052 && north <= 85.052 && north > south && west >= -180 && east <= 180 && east > west)
         require(north - south <= 10 && east - west <= 10) { "Use regional packs up to 10 degrees" }
         require(rows in 2..257 && columns in 2..257 && heights.size == rows * columns)
         require(heights.all { it == null || (it.isFinite() && it in -12000.0..10000.0) })
@@ -55,8 +55,8 @@ data class TerrainPack(
         val step=max(1,(max(rows,columns)-1)/128)
         val x=(p.longitude-west)/(east-west)*(columns-1)
         val y=(north-p.latitude)/(north-south)*(rows-1)
-        val ix=(floor(x/step).toInt()*step).coerceIn(0,columns-2)
-        val iy=(floor(y/step).toInt()*step).coerceIn(0,rows-2)
+        val ix=(floor(x/step).toInt()*step).coerceIn(0,((columns-2)/step)*step)
+        val iy=(floor(y/step).toInt()*step).coerceIn(0,((rows-2)/step)*step)
         val x1=min(columns-1,ix+step);val y1=min(rows-1,iy+step)
         val a=heights[iy*columns+ix] ?: return null
         val b=heights[iy*columns+x1] ?: return null

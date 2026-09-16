@@ -2,6 +2,8 @@ package com.traveler.feature.video.ui
 
 import android.widget.Toast
 import androidx.compose.foundation.background
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -44,6 +46,7 @@ fun ExportVideoDialog(
     val coroutineScope = rememberCoroutineScope()
 
     var selectedProfile by remember { mutableStateOf(StoryDurationProfile.STANDARD) }
+    var resolution by remember { mutableStateOf(com.traveler.feature.video.VideoResolution.FULL_HD) }
     var includeMusic by remember { mutableStateOf(true) }
     var generalizeHomeAddress by remember { mutableStateOf(true) }
     var exportState by remember { mutableStateOf<VideoExportState>(VideoExportState.Idle) }
@@ -68,6 +71,14 @@ fun ExportVideoDialog(
     DisposableEffect(Unit) {
         onDispose { currentEncoder?.cancel(); exportJob?.cancel() }
     }
+
+    val backup = androidx.activity.compose.rememberLauncherForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.CreateDocument("application/json")
+    ) { uri -> if(uri!=null) coroutineScope.launch {
+        try { com.traveler.core.terrain.TripArchive.export(context,trip,uri);Toast.makeText(context,"Journey backup saved. Original photos are not included.",Toast.LENGTH_LONG).show() }
+        catch(e:kotlinx.coroutines.CancellationException) { throw e }
+        catch(e:Exception) { Toast.makeText(context,e.message ?: "Backup failed",Toast.LENGTH_LONG).show() }
+    } }
 
     // Dynamically calculate estimated durations for the 3 profiles (P1)
     val shortTimeline = remember(trip, renderModel) {
@@ -104,7 +115,9 @@ fun ExportVideoDialog(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(20.dp),
+                    .padding(20.dp)
+                    .heightIn(max=600.dp)
+                    .verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
                 // Header
@@ -137,6 +150,12 @@ fun ExportVideoDialog(
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
 
+                        Row {
+                            com.traveler.feature.video.VideoResolution.values().forEach { option ->
+                                FilterChip(selected=resolution==option,onClick={resolution=option},label={Text(option.label)},modifier=Modifier.padding(end=8.dp))
+                            }
+                        }
+                        Text("1080p uses 720p if the device encoder requires it. Terrain uses regions already saved on this phone.",fontSize=11.sp)
                         // Length Profiles
                         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                             ProfileOptionCard(
@@ -165,6 +184,7 @@ fun ExportVideoDialog(
                             )
                         }
 
+                        TextButton(onClick={backup.launch("journey-${trip.startDateIso}.travel3d.json")}) { Text("Back up this journey") }
                         // Export Options Toggles
                         Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                             Row(
@@ -189,7 +209,7 @@ fun ExportVideoDialog(
                             ) {
                                 Column(modifier = Modifier.weight(1f)) {
                                     Text("Generalize Home Location", fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
-                                    Text("Hides exact address numbers for privacy", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    Text("Generalizes place labels; route and photo contents stay visible", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                 }
                                 Switch(
                                     checked = generalizeHomeAddress,
@@ -214,6 +234,7 @@ fun ExportVideoDialog(
                                         renderModel = renderModel,
                                         profile = selectedProfile,
                                         includeMusic = includeMusic,
+                                        resolution = resolution,
                                         generalizeHomeAddress = generalizeHomeAddress,
                                         encoderRef = { enc -> currentEncoder = enc },
                                         onProgress = { p ->

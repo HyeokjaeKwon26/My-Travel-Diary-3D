@@ -175,6 +175,19 @@ class TravelVideoExportAndroidTest {
                 assertEquals("Negative PTS deltas must be 0", 0, negativeDeltaCount)
                 assertTrue("Sample count must be > 50", sampleCount > 50)
                 assertTrue("Last PTS must not be in hour range (< 300s)", lastPtsUs < 300_000_000L)
+                extractor.unselectTrack(videoTrackIdx)
+                val audioTrack=(0 until extractor.trackCount).first { extractor.getTrackFormat(it)
+                    .getString(android.media.MediaFormat.KEY_MIME)?.startsWith("audio/")==true }
+                extractor.selectTrack(audioTrack)
+                extractor.seekTo(0,android.media.MediaExtractor.SEEK_TO_CLOSEST_SYNC)
+                var lastAudio=-1L
+                var audioSamples=0
+                while(extractor.readSampleData(byteBuf,0)>=0) {
+                    assertTrue(extractor.sampleTime>=lastAudio)
+                    lastAudio=extractor.sampleTime;audioSamples++;extractor.advance()
+                }
+                assertTrue(audioSamples>50)
+                assertTrue("Audio must reach the end of the video",kotlin.math.abs(lastAudio-lastPtsUs)<250_000)
             } finally {
                 extractor.release()
             }
@@ -196,6 +209,7 @@ class TravelVideoExportAndroidTest {
                 renderModel = renderModel,
                 profile = StoryDurationProfile.SHORT,
                 includeMusic = false,
+                resolution = VideoResolution.HD,
                 generalizeHomeAddress = true
             )
 
@@ -209,6 +223,8 @@ class TravelVideoExportAndroidTest {
                 val hasAudio = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_HAS_AUDIO)
 
                 assertEquals("Video track must be present", "yes", hasVideo)
+                assertEquals("720",retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_WIDTH))
+                assertEquals("1280",retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_HEIGHT))
                 assertTrue("Audio track must NOT be present when Music = OFF", hasAudio == null || hasAudio == "no")
             } finally {
                 retriever.release()

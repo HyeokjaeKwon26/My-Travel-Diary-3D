@@ -300,7 +300,11 @@ def generate_soundtrack():
 
     raw_dir = os.path.normpath(os.path.join(os.path.dirname(__file__), "..", "app", "src", "main", "res", "raw"))
     os.makedirs(raw_dir, exist_ok=True)
-    out_wav = os.path.join(raw_dir, "traveler_memories.wav")
+    import tempfile, subprocess, shutil
+    ffmpeg = os.environ.get("FFMPEG") or shutil.which("ffmpeg")
+    if not ffmpeg:
+        raise RuntimeError("Install ffmpeg or set FFMPEG to its executable path before generating the soundtrack")
+    out_wav = os.path.join(tempfile.mkdtemp(prefix="travel-soundtrack-"), "traveler_memories.wav")
 
     with wave.open(out_wav, "wb") as wf:
         wf.setnchannels(2)
@@ -313,9 +317,13 @@ def generate_soundtrack():
             interleaved.extend(struct.pack("<hh", sl, sr))
         wf.writeframes(interleaved)
 
-    file_size = os.path.getsize(out_wav)
+    out_m4a = os.path.join(raw_dir, "traveler_memories.m4a")
+    subprocess.run([ffmpeg, "-y", "-i", out_wav, "-c:a", "aac", "-b:a", "128k", "-movflags", "+faststart", out_m4a], check=True)
+    os.remove(out_wav)
+    os.rmdir(os.path.dirname(out_wav))
+    file_size = os.path.getsize(out_m4a)
     elapsed = time.time() - start_time
-    print(f"Generated soundtrack asset in {elapsed:.2f}s: {out_wav}")
+    print(f"Generated soundtrack asset in {elapsed:.2f}s: {out_m4a}")
     print(f"  Duration: {DURATION_SEC:.2f}s | Tempo: {BPM} BPM | Size: {file_size:,} bytes")
     print(f"  Character: Rich Orchestral Strings + French Horn Fanfare + Pop/Orchestral Drums + Hall Reverb")
 
