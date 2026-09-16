@@ -27,6 +27,7 @@ class TravelGlRenderer(private val context: Context, val scene: SceneGeometry,
     private var mapRevision=-1L
     private var lastMapUpload=0L
     private var paintedTiles=emptyList<StreetTile>()
+    @Volatile var mapFrameReady=false;private set
     private var localBase: Mesh? = null
     private var mapBoundsUniform = 0
     private var mapTextureUniform = 0
@@ -39,15 +40,19 @@ class TravelGlRenderer(private val context: Context, val scene: SceneGeometry,
     private var routes = emptyList<Mesh>()
     private val vehicleBuffer = ByteBuffer.allocateDirect(16384 * 36).order(ByteOrder.nativeOrder()).asFloatBuffer()
     private var positionAttribute=0; private var colorAttribute=0; private var uvAttribute=0
+    private var routeScaleUniform=0
     private var matrixUniform=0; private var textureUniform=0; private var useTextureUniform=0; private var alphaUniform=0
 
     fun initialize() {
         val vs = shader(GL.GL_VERTEX_SHADER,"""
             uniform mat4 uMatrix; attribute vec3 aPosition; attribute vec4 aColor; attribute vec2 aUv;
-            uniform mediump float uUseTexture; uniform vec4 uMapBounds;
+            uniform mediump float uUseTexture; uniform vec4 uMapBounds; uniform float uRouteScale;
             varying vec4 vColor; varying vec2 vUv; varying vec2 vGlobeUv;
             void main(){
-                gl_Position=uMatrix*vec4(aPosition,1.0); vColor=aColor; vUv=aUv; vGlobeUv=aUv;
+                vec3 p=aPosition;
+                vColor=aColor; vUv=aUv; vGlobeUv=aUv;
+                if(uUseTexture < -0.5) { p+=vec3(aUv,aColor.a)*uRouteScale;vColor.a=1.0; }
+                gl_Position=uMatrix*vec4(p,1.0);
                 if(uUseTexture>1.5){
                     float dx=aUv.x-uMapBounds.x;
                     dx-=floor(dx+0.5);
@@ -78,6 +83,7 @@ class TravelGlRenderer(private val context: Context, val scene: SceneGeometry,
         uvAttribute=GL.glGetAttribLocation(program,"aUv"); matrixUniform=GL.glGetUniformLocation(program,"uMatrix")
         textureUniform=GL.glGetUniformLocation(program,"uTexture"); useTextureUniform=GL.glGetUniformLocation(program,"uUseTexture")
         alphaUniform=GL.glGetUniformLocation(program,"uAlpha")
+        routeScaleUniform=GL.glGetUniformLocation(program,"uRouteScale")
         mapBoundsUniform=GL.glGetUniformLocation(program,"uMapBounds")
         mapTextureUniform=GL.glGetUniformLocation(program,"uMapTexture")
         val ids=IntArray(1); GL.glGenTextures(1,ids,0); texture=ids[0]
@@ -101,20 +107,21 @@ class TravelGlRenderer(private val context: Context, val scene: SceneGeometry,
         routes=scene.routes.map { route ->
             val values=ArrayList<Float>()
             val color=if(route.mode==TransportMode.AIRPLANE) floatArrayOf(.74f,.64f,1f,1f) else floatArrayOf(.02f,.48f,.52f,1f)
-            for(i in 0 until route.xyz.lastIndex) if(!route.uncertainEdges[i]) {
+            for(i in 0 until route.xyz.lastIndex) if(!route.estimated || i % 4 < 2) {
                 val a=route.xyz[i]; val b=route.xyz[i+1]
-                if(route.mode==TransportMode.AIRPLANE) {
-                    vertex(values,a,color);vertex(values,b,color)
-                } else {
-                    val side=(b-a).cross((a+b).unit()).unit()*(8.0/EarthGeometry.R)
-                    for(p in listOf(a-side,a+side,b-side,b-side,a+side,b+side)) vertex(values,p,color)
+                val side=(b-a).cross((a+b).unit()).unit()
+                fun edge(p:Vec3,sign:Double) {
+                    val offset=side*sign
+                    vertex(values,p,floatArrayOf(color[0],color[1],color[2],offset.z.toFloat()),offset.x.toFloat(),offset.y.toFloat())
                 }
+                edge(a,-1.0);edge(a,1.0);edge(b,-1.0)
+                edge(b,-1.0);edge(a,1.0);edge(b,1.0)
             }
             mesh(values)
         }
     }
 
-    fun render(width: Int,height: Int,state: TravelPlaybackState?, calm: Boolean=true,mapScale:Double=1.0) {
+    fun render(width: Int,height: Int,state: TravelPlaybackState?, calm: Boolean=true,mapScale:Double=1.0, detailWidth:Int=width, detailHeight:Int=height) {
         check(program!=0)
         GL.glViewport(0,0,width,height); GL.glClearColor(.025f,.055f,.09f,1f)
         GL.glClear(GL.GL_COLOR_BUFFER_BIT or GL.GL_DEPTH_BUFFER_BIT)
@@ -122,13 +129,13 @@ class TravelGlRenderer(private val context: Context, val scene: SceneGeometry,
         GL.glEnable(GL.GL_BLEND); GL.glBlendFunc(GL.GL_SRC_ALPHA,GL.GL_ONE_MINUS_SRC_ALPHA)
         val routeIndex=scene.routes.indexOfFirst { it.episodeIndex==state?.episodeIndex && it.id==state.currentSegment?.id }
         val motion=state?.let { scene.motion(it) }
-        val focus=motion?.position ?: scene.overviewCenter
+        val camera = scene.camera.frame(state,width,height)
+        val focus=camera.focus
         val up=focus.unit()
         val centerPoint=GeoPoint(Math.toDegrees(asin(up.y)),Math.toDegrees(atan2(-up.z,up.x)))
         // North-up changes only the camera, never the vehicle's route heading.
         val forward=if(calm || motion==null) EarthGeometry.north(centerPoint) else motion.forward
-        val distance=if(state==null) scene.overviewDistance else
-            NorthUpCamera.distance(state.currentTransportMode,state.cameraSpanLat)*mapScale.coerceIn(.5,6.0)
+        val distance=camera.distance
         val cameraRight=forward.cross(up).unit()
         var eye=if(calm) focus+up*(distance*.94)-forward*(distance*.34)
             else focus+up*(distance*.65)-forward*(distance*.75)+cameraRight*(if(state==null)0.0 else distance*.5)
@@ -146,9 +153,9 @@ class TravelGlRenderer(private val context: Context, val scene: SceneGeometry,
         GL.glActiveTexture(GL.GL_TEXTURE0); GL.glBindTexture(GL.GL_TEXTURE_2D,texture); GL.glUniform1i(textureUniform,0)
         world?.let { draw(it,GL.GL_TRIANGLES,1f,1) }
         val center=GeoPoint(Math.toDegrees(asin(up.y)),Math.toDegrees(atan2(-up.z,up.x)))
-        updateMap(center,distance,width,height)
-        localBase?.let { draw(it,GL.GL_TRIANGLES,1f,2) }
         if(distance<.1) {
+            updateMap(center,distance,detailWidth,detailHeight,calm)
+            localBase?.let { draw(it,GL.GL_TRIANGLES,1f,2) }
             val nearby=scene.packs.indices.sortedBy { i ->
                 val p=scene.packs[i]
                 com.traveler.core.common.geo.GeodesicUtils.distanceMeters(center,
@@ -156,14 +163,21 @@ class TravelGlRenderer(private val context: Context, val scene: SceneGeometry,
             }.take(12).toSet()
             terrain.keys.toList().filter { it !in nearby }.forEach { terrain.remove(it) }
             for(i in nearby) draw(terrain.getOrPut(i) { buildTerrain(scene.packs[i]) },GL.GL_TRIANGLES,1f,2)
+        } else {
+            // The local mesh and globe are nearly coplanar at continental scale;
+            // a 16-bit depth buffer cannot separate them and produces a checkerboard.
+            // At this scale the globe texture supplies geographic context directly.
+            streets.request(StreetTilePlan(emptyList(),0))
+            mapFrameReady=true
         }
+        GL.glUniform1f(routeScaleUniform,max(8.0/EarthGeometry.R,distance*2*tan(Math.toRadians(21.0))*2.2/max(1,height)).toFloat())
         // Do not show future / return paths over the current journey during playback.
         routes.forEachIndexed { i,mesh ->
             val r=scene.routes[i]
-            val alpha=if(state==null) .85f else if(i==routeIndex) 1f else if(r.endMs<=state.storyTimeMs) .22f else 0f
-            if(alpha>0) { GL.glLineWidth(if(i==routeIndex) 4f else 2f); draw(mesh,if(r.mode==TransportMode.AIRPLANE) GL.GL_LINES else GL.GL_TRIANGLES,alpha) }
+            val alpha=if(state==null || state.isTitleCardActive || state.isEndCardActive) .85f else if(i==routeIndex) 1f else if(r.endMs<=state.storyTimeMs) .22f else 0f
+            if(alpha>0) { GL.glLineWidth(if(i==routeIndex) 4f else 2f); draw(mesh,GL.GL_TRIANGLES,alpha,-1) }
         }
-        if(state!=null && motion!=null && !scene.uncertain(state)) {
+        if(state!=null && motion!=null && !state.isTitleCardActive && !state.isEndCardActive) {
             val mode=state.currentTransportMode
             val modelSize=VehicleAnimation.scale(distance,width,height,mode)
             val pose=VehicleAnimation.pose(mode,state.progress.toDouble()*scene.timeline.totalStoryDurationSeconds,
@@ -173,7 +187,7 @@ class TravelGlRenderer(private val context: Context, val scene: SceneGeometry,
             val pitchedUp=up*cos(pose.pitch)-front*sin(pose.pitch)
             val rolledRight=right*cos(pose.roll)+pitchedUp*sin(pose.roll)
             val rolledUp=pitchedUp*cos(pose.roll)-right*sin(pose.roll)
-            val origin=focus+up*(modelSize*(.15+pose.bounce))
+            val origin=motion.position+motion.position.unit()*(modelSize*(.15+pose.bounce))
             val toy=ToyVehicle.mesh(mode,pose.phase)
             check(toy.size/7<=16384)
             vehicleBuffer.clear()
@@ -223,11 +237,60 @@ class TravelGlRenderer(private val context: Context, val scene: SceneGeometry,
                 }
                 triangle(listOf(a,b,d)); triangle(listOf(d,b,e))
             }
+            // Blend an uncovered DEM edge back to the reference globe. Without this
+            // apron, a 2 km plateau ends abruptly and roads appear to jump at the seam.
+            // This is a visual coverage transition, never persisted as measured altitude.
+            fun apron(a:GeoPoint,ah:Double,b:GeoPoint,bh:Double,north:Double,east:Double) {
+                fun outside(p:GeoPoint,metres:Double)=GeoPoint(
+                    (p.latitude+north*metres/111_000).coerceIn(-85.0,85.0),
+                    p.longitude+east*metres/(111_000*max(.15,cos(Math.toRadians(p.latitude)))))
+                val midpoint=GeoPoint((a.latitude+b.latitude)/2,(a.longitude+b.longitude)/2)
+                if(scene.ground(outside(midpoint,30.0))!=null) return
+                fun point(p:GeoPoint,h:Double,step:Int):Pair<GeoPoint,Double> {
+                    val f=step/8.0
+                    return outside(p,f*6000.0) to (h*(1-f*f*(3-2*f))-2*f)
+                }
+                fun add(ph:Pair<GeoPoint,Double>) {
+                    val uv=WebMercator.project(ph.first)
+                    vertex(values,EarthGeometry.position(ph.first,ph.second),floatArrayOf(1f,1f,1f,1f),uv.x.toFloat(),uv.y.toFloat())
+                }
+                for(k in 0..7) {
+                    if(scene.ground(outside(midpoint,(k+.5)*750))!=null) continue
+                    val p=point(a,ah,k);val q=point(b,bh,k)
+                    val r=point(a,ah,k+1);val t=point(b,bh,k+1)
+                    for(v in listOf(p,q,r,r,q,t)) add(v)
+                }
+            }
+            for(c in 0 until pack.columns-1 step step) {
+                val c1=min(pack.columns-1,c+step)
+                val x=pack.west+(pack.east-pack.west)*c/(pack.columns-1)
+                val x1=pack.west+(pack.east-pack.west)*c1/(pack.columns-1)
+                for((row,n) in listOf(0 to 1.0,pack.rows-1 to -1.0)) {
+                    val a=pack.heights[row*pack.columns+c] ?: continue
+                    val b=pack.heights[row*pack.columns+c1] ?: continue
+                    val y=if(row==0)pack.north else pack.south
+                    apron(GeoPoint(y,x),a.toDouble(),GeoPoint(y,x1),b.toDouble(),n,0.0)
+                }
+            }
+            for(r in 0 until pack.rows-1 step step) {
+                val r1=min(pack.rows-1,r+step)
+                val y=pack.north-(pack.north-pack.south)*r/(pack.rows-1)
+                val y1=pack.north-(pack.north-pack.south)*r1/(pack.rows-1)
+                for((col,e) in listOf(0 to -1.0,pack.columns-1 to 1.0)) {
+                    val a=pack.heights[r*pack.columns+col] ?: continue
+                    val b=pack.heights[r1*pack.columns+col] ?: continue
+                    val x=if(col==0)pack.west else pack.east
+                    apron(GeoPoint(y,x),a.toDouble(),GeoPoint(y1,x),b.toDouble(),0.0,e)
+                }
+            }
             return mesh(values)
     }
 
-    private fun updateMap(center:GeoPoint,distance:Double,width:Int,height:Int) {
-        val wanted=mapDrape.window(center.latitude,center.longitude,distance,width.toDouble()/max(1,height))
+    private fun updateMap(center:GeoPoint,distance:Double,width:Int,height:Int,northUp:Boolean) {
+        // North-up's steep camera needs half the old orbit-camera padding. Keep the
+        // visible map sharp within the same 2048px atlas, without more texture memory.
+        val coverageDistance=distance * if(northUp) .5 else 1.0
+        val wanted=mapDrape.window(center.latitude,center.longitude,coverageDistance,width.toDouble()/max(1,height))
         val p=WebMercator.project(center)
         GL.glActiveTexture(GL.GL_TEXTURE1);GL.glBindTexture(GL.GL_TEXTURE_2D,mapTexture)
         val moved=mapWindow?.containsCenter(p.x,p.y,wanted.span)!=true
@@ -262,6 +325,7 @@ class TravelGlRenderer(private val context: Context, val scene: SceneGeometry,
             try { GLUtils.texImage2D(GL.GL_TEXTURE_2D,0,bitmap,0) } finally { bitmap.recycle() }
             mapRevision=paintedRevision;paintedTiles=plan.tiles;lastMapUpload=now
         }
+        mapFrameReady=mapRevision==streets.version && paintedTiles==plan.tiles
         GL.glUniform4f(mapBoundsUniform,w.x.toFloat(),w.y.toFloat(),(1/w.span).toFloat(),0f)
         GL.glUniform1i(mapTextureUniform,1)
         GL.glActiveTexture(GL.GL_TEXTURE0)

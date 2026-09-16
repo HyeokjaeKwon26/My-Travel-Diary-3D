@@ -30,6 +30,7 @@ class PhotoStoryEngineTest {
             confidenceScore = 0.95f,
             matchedVisitId = matchedVisitId,
             matchedSegmentId = matchedSegmentId,
+            visualFeatures = PhotoVisualFeatures(42L, 500f, .8f, listOf(.2f,.8f)),
             isRepresentative = isRepresentative
         )
     }

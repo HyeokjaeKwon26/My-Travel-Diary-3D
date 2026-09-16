@@ -18,6 +18,13 @@ class StreetTilePlanTest {
         assertTrue(wrapped.tiles.any { it.x==0 })
         assertTrue(wrapped.tiles.any { it.x==(1 shl wrapped.zoom)-1 })
     }
+    @Test fun readableDetailUsesAvailableTileBudget() {
+        val f=MapFootprint(.5,.5,.501,.5006)
+        val plan=StreetTilePlan.visible(f,720,432)
+        val pixelsAcross=(f.right-f.left)*(1 shl plan.zoom)*256
+        assertTrue("Road labels should not be magnified from an unnecessarily low zoom", pixelsAcross>=720)
+        assertTrue(plan.tiles.size<=24)
+    }
     @Test fun groundZoomIsStableRegardlessOfOldArrivalCameraSpan() {
         for(mode in TransportMode.entries.filter { it!=TransportMode.AIRPLANE }) {
             assertEquals(NorthUpCamera.distance(mode,.005),NorthUpCamera.distance(mode,20.0),0.0)

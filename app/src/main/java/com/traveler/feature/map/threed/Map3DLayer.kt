@@ -22,14 +22,15 @@ import com.traveler.feature.map.story.TravelStoryTimeline
 import kotlinx.coroutines.*
 
 @Composable
-fun Map3DLayer(model:TravelMapRenderModel,timeline:TravelStoryTimeline,state:TravelPlaybackState?, playing:Boolean=false,
+fun Map3DLayer(model:TravelMapRenderModel,timeline:TravelStoryTimeline,state:TravelPlaybackState?, playing:Boolean=false,onBuffering:(Boolean)->Unit={},
                fallback:@Composable ()->Unit) {
     val context=LocalContext.current
     val scope=rememberCoroutineScope()
+    var sceneReady by remember { mutableStateOf(false) }
     var use3D by remember { mutableStateOf(true) }
     val preferences = remember { context.getSharedPreferences("scene_preferences", 0) }
     val calm=true // RC4 intentionally ignores the older orbit/follow-heading preference.
-    var mapScale by remember { mutableStateOf(preferences.getFloat("mapScale",1f).toDouble()) }
+    val mapScale = 1.0
     var internetMaps by remember { mutableStateOf(preferences.getBoolean("internetMaps",true)) }
     var mapStatus by remember { mutableStateOf("Reference map · loading street detail") }
     val uriHandler=androidx.compose.ui.platform.LocalUriHandler.current
@@ -76,11 +77,17 @@ fun Map3DLayer(model:TravelMapRenderModel,timeline:TravelStoryTimeline,state:Tra
     }
     Box(Modifier.fillMaxSize()) {
         if(use3D) {
-            if(scene!=null) Travel3DSurface(scene!!,state,calm,Modifier.fillMaxSize(),mapScale,internetMaps,{mapStatus=it}) {
-                message=it;use3D=false
+            if(scene!=null) Travel3DSurface(scene!!,state,calm,Modifier.fillMaxSize(),mapScale,internetMaps,{mapStatus=it},onBuffering,{sceneReady=it}) {
+                message=it;use3D=false;onBuffering(false)
             } else CircularProgressIndicator(Modifier.align(Alignment.Center))
         } else fallback()
-        if (scene?.uncertain(state) == true) Text("Elevation uncertain • vehicle hidden",
+        if(use3D && !sceneReady) Column(Modifier.align(Alignment.Center),horizontalAlignment=Alignment.CenterHorizontally) {
+            CircularProgressIndicator()
+            Text("Preparing map…",Modifier.padding(8.dp))
+        }
+        if (state?.currentSegment?.geometryProvenance == com.traveler.core.model.GeometryProvenance.CONTINUITY_ESTIMATE) Text("Estimated route",
+            color=Color.White, fontSize=12.sp, modifier=Modifier.align(Alignment.CenterStart).padding(8.dp))
+        if (scene?.uncertain(state) == true) Text("Height estimated",
             color=Color.White, fontSize=12.sp, modifier=Modifier.align(Alignment.Center)
                 .background(Color(0xDD102638),RoundedCornerShape(8.dp)).padding(8.dp))
         if(use3D) Column(Modifier.align(Alignment.BottomStart).padding(start=6.dp,bottom=68.dp)
@@ -113,14 +120,9 @@ fun Map3DLayer(model:TravelMapRenderModel,timeline:TravelStoryTimeline,state:Tra
             Text("Terrain storage: %.1f MB / %d MB".format(storedBytes/1_000_000.0,limitMb),fontSize=12.sp)
             Row { listOf(100,200,500).forEach { mb -> TextButton(onClick={action { JourneyTerrain.setBudget(context,mb);limitMb=mb }}) { Text("$mb MB") } } }
             TextButton(onClick={action { plan?.let { JourneyTerrain.pause(context,it.key) };JourneyTerrain.clearTemporary(context);plan?.let { packs=JourneyTerrain.load(context,it.key) } }}) { Text("Clear temporary terrain") }
-            TextButton(onClick={use3D=!use3D}) { Text(if(use3D) "Switch to 2D map" else "Switch to 3D map") }
+            TextButton(onClick={use3D=!use3D;if(!use3D)onBuffering(false)}) { Text(if(use3D) "Switch to 2D map" else "Switch to 3D map") }
             Text("Camera: north up. The map follows your location without rotating or arrival zooms.",fontSize=12.sp)
-            Text("Map scale",fontSize=13.sp)
-            Row { listOf("Close" to .5,"Local" to 1.0,"Area" to 2.5,"Region" to 6.0).forEach { (label,factor) ->
-                TextButton(onClick={mapScale=factor;preferences.edit().putFloat("mapScale",factor.toFloat()).apply()}) {
-                    Text(if(mapScale==factor)"• $label" else label)
-                }
-            } }
+            Text("Automatic route framing · no pinch zoom. The same framing is used in your video.",fontSize=12.sp)
             Row(verticalAlignment=Alignment.CenterVertically) {
                 Text("Internet street detail",Modifier.weight(1f),fontSize=13.sp)
                 Switch(checked=internetMaps,onCheckedChange={internetMaps=it;preferences.edit().putBoolean("internetMaps",it).apply()})

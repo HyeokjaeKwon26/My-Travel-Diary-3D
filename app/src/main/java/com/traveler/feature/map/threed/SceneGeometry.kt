@@ -73,8 +73,18 @@ class SceneGeometry(val model: TravelMapRenderModel, val timeline: TravelStoryTi
         }
         val dem=points.map { ground(it) }
         val known=if(dem.any { it!=null }) dem else points.map { it.altitudeMeters }
-        var lastHeight=known.firstOrNull { it!=null } ?: 0.0
-        val heights=known.map { h -> if(h!=null) lastHeight=h;lastHeight }
+        // Fill elevation holes without deleting a valid horizontal track. Interpolation
+        // is by travelled distance, not point count; the source journey stays untouched.
+        val heights = DoubleArray(known.size)
+        val anchors = known.indices.filter { known[it]?.isFinite() == true }
+        if (anchors.isNotEmpty()) {
+            for (i in 0..anchors.first()) heights[i] = known[anchors.first()]!!
+            for ((a,b) in anchors.zipWithNext()) for (i in a..b) {
+                val f = ((distances[i]-distances[a]) / max(1.0,distances[b]-distances[a])).coerceIn(0.0,1.0)
+                heights[i] = known[a]!! * (1-f) + known[b]!! * f
+            }
+            for (i in anchors.last()..known.lastIndex) heights[i] = known[anchors.last()]!!
+        }
         val hasHeight=known.any { it!=null }
         val uncertain = points.zipWithNext().mapIndexed { i,_ ->
             ep.segment.effectiveMode != TransportMode.AIRPLANE &&
@@ -90,7 +100,8 @@ class SceneGeometry(val model: TravelMapRenderModel, val timeline: TravelStoryTi
         }
         SceneRoute(episodeIndex,ep.segment.id,ep.startTimestampEpochMs,ep.endTimestampEpochMs,points,xyz,distances,uncertain,
             ep.segment.effectiveMode,ep.segment.geometryProvenance.name.contains("ESTIMAT") ||
-                ep.segment.geometryProvenance.name.contains("INTERPOLAT"))
+                ep.segment.geometryProvenance.name.contains("INTERPOLAT") ||
+                (ep.segment.simplifiedPoints.size < 2 && ep.segment.rawPoints.size < 2))
     }
     private fun bracket(state: TravelPlaybackState): Pair<SceneRoute, Pair<Int, Double>>? {
         val route = routes.firstOrNull { it.episodeIndex == state.episodeIndex && it.id == state.currentSegment?.id } ?: return null
@@ -106,16 +117,10 @@ class SceneGeometry(val model: TravelMapRenderModel, val timeline: TravelStoryTi
     fun uncertain(state: TravelPlaybackState?): Boolean = state?.let { bracket(it)?.let { (r,b) -> r.uncertainEdges[b.first] } } ?: false
     fun routePosition(state: TravelPlaybackState): Vec3? = bracket(state)?.let { (r,b) ->
         val (i,f)=b
-        if (r.uncertainEdges[i]) {
-            // Camera-only conservative framing. Vehicle/route edge are suppressed;
-            // never present a guessed descent as a measured journey.
-            val h=max((r.xyz[i].length()-1)*EarthGeometry.R,(r.xyz[i+1].length()-1)*EarthGeometry.R)
-            EarthGeometry.position(state.currentPosition,h)
-        } else interpolate(r,i,f)
+        interpolate(r,i,f)
     }
 
     private fun interpolate(r:SceneRoute,i:Int,f:Double):Vec3 {
-        if(r.mode!=TransportMode.AIRPLANE) return r.xyz[i]*(1-f)+r.xyz[i+1]*f
         // A chord between flight fixes dives inside the globe. Interpolate geography
         // on the sphere, with altitude separately, including when seeking backwards.
         val geo=GeodesicUtils.interpolate(r.points[i],r.points[i+1],f)
@@ -149,6 +154,7 @@ class SceneGeometry(val model: TravelMapRenderModel, val timeline: TravelStoryTi
         val turn=atan2(up.dot(incoming.cross(outgoing)),incoming.dot(outgoing)).coerceIn(-1.0,1.0)
         return SceneMotion(position,forward,slope,turn)
     }
+    val camera = JourneyCamera(this)
     val overviewPoints = routes.flatMap { it.xyz }.ifEmpty { model.visits.map { EarthGeometry.position(it.location,surface(it.location)) } }
     val overviewCenter = model.focusedLocation?.let { EarthGeometry.position(it, surface(it)) } ?: overviewPoints.fold(Vec3(0.0,0.0,0.0)) { a,b -> a+b }.let {
         if (it.length() < 1e-6) Vec3(1.0,0.0,0.0) else it.unit()

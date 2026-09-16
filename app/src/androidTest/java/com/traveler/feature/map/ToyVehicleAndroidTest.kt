@@ -24,6 +24,8 @@ import java.nio.ByteBuffer
 class ToyVehicleAndroidTest {
     @Test fun allModesAndLongFlightsAreVisible() {
         val context=InstrumentationRegistry.getInstrumentation().targetContext
+        // Saturated colors in a user's cached street map must not be mistaken for toy pixels.
+        val mapCache=File(context.cacheDir,"toy-map-fixture-${System.nanoTime()}").apply { mkdirs() }
         val display=EGL14.eglGetDisplay(EGL14.EGL_DEFAULT_DISPLAY)
         assertTrue(EGL14.eglInitialize(display,IntArray(2),0,IntArray(2),1))
         val configs=arrayOfNulls<android.opengl.EGLConfig>(1)
@@ -49,7 +51,7 @@ class ToyVehicleAndroidTest {
                 val model=TravelMapRenderModel(emptyList(),listOf(segment))
                 val timeline=TravelStoryTimeline.build(model)
                 val scene=SceneGeometry(model,timeline,emptyList())
-                val renderer=TravelGlRenderer(context,scene)
+                val renderer=TravelGlRenderer(context,scene,StreetMapSession(context,cacheDirectory=mapCache))
                 try {
                     renderer.initialize()
                     for((index,progress) in listOf(.25f,.50f,.75f).withIndex()) {
@@ -71,20 +73,33 @@ class ToyVehicleAndroidTest {
                                 count++;left=minOf(left,x);right=maxOf(right,x);top=minOf(top,y);bottom=maxOf(bottom,y)
                             }
                         }
-                        assertTrue("$mode/$dateline/$index invisible: $count",count>200)
-                        assertTrue("$mode too small: ${right-left} x ${bottom-top}",maxOf(right-left,bottom-top)>45)
-                        assertTrue("$mode clipped",left>0 && top>0 && right<width-1 && bottom<height-1)
                         val bitmap=Bitmap.createBitmap(pixels,width,height,Bitmap.Config.ARGB_8888)
                         val name="toy-${mode.name.lowercase()}-$dateline-$index.png"
                         val output=File(context.getExternalFilesDir(null),name)
                         output.outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG,100,it) };bitmap.recycle()
                         UiDevice.getInstance(InstrumentationRegistry.getInstrumentation()).executeShellCommand("cp ${output.path} /sdcard/Download/$name")
+                        if(mode==TransportMode.AIRPLANE) {
+                            // A local light-colored map used to z-fight with the dark globe,
+                            // creating bright checkerboard patches across continental flights.
+                            var brightOutsideToy=0
+                            for(y in 0 until height) for(x in 0 until width) {
+                                if(x in (left-24)..(right+24) && y in (top-24)..(bottom+24)) continue
+                                val i=(y*width+x)*4
+                                if((bytes.get(i).toInt() and 255)>195 && (bytes.get(i+1).toInt() and 255)>195 &&
+                                    (bytes.get(i+2).toInt() and 255)>195) brightOutsideToy++
+                            }
+                            assertTrue("Continental globe must not contain bright local-map checkerboards: $brightOutsideToy",brightOutsideToy<30)
+                        }
+                        assertTrue("$mode/$dateline/$index invisible: $count",count>200)
+                        assertTrue("$mode too small: ${right-left} x ${bottom-top}",maxOf(right-left,bottom-top)>45)
+                        assertTrue("$mode/$dateline/$index clipped at $left,$top,$right,$bottom",left>0 && top>0 && right<width-1 && bottom<height-1)
                     }
                 } finally { renderer.release() }
             }
         } finally {
             EGL14.eglMakeCurrent(display,EGL14.EGL_NO_SURFACE,EGL14.EGL_NO_SURFACE,EGL14.EGL_NO_CONTEXT)
             EGL14.eglDestroySurface(display,surface);EGL14.eglDestroyContext(display,egl);EGL14.eglTerminate(display)
+            mapCache.deleteRecursively()
         }
     }
 }

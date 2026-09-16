@@ -50,6 +50,7 @@ data class MediaItem(
     val assignedDayIso: String? = null,     // Distinct persisted diary day (e.g. "2026-07-02")
     val dayAssignmentConfidence: DayAssignmentConfidence = DayAssignmentConfidence.UNKNOWN,
     val dayAssignmentProvenance: String? = null,
+    val visualFeatures: com.traveler.core.media.PhotoVisualFeatures? = null,
     val captureEvidence: MediaCaptureEvidence = MediaCaptureEvidence.UNKNOWN
 ) {
     val isVideo: Boolean

@@ -14,11 +14,13 @@ import javax.microedition.khronos.opengles.GL10
 
 @Composable
 fun Travel3DSurface(scene: SceneGeometry, state: TravelPlaybackState?, calm: Boolean, modifier: Modifier,
-                    mapScale:Double=1.0, internetMaps:Boolean=true,onMapStatus:(String)->Unit={},
+                    mapScale:Double=1.0, internetMaps:Boolean=true,onMapStatus:(String)->Unit={},onBuffering:(Boolean)->Unit={},onReady:(Boolean)->Unit={},
                     onError: (String) -> Unit) {
     val context=LocalContext.current
     val lifecycle=LocalLifecycleOwner.current.lifecycle
     val errorCallback by rememberUpdatedState(onError)
+    val readyCallback by rememberUpdatedState(onReady)
+    val bufferCallback by rememberUpdatedState(onBuffering)
     val mapStatusCallback by rememberUpdatedState(onMapStatus)
     val bridge=remember(scene) { SceneBridge(context,scene) { message -> errorCallback(message) } }
     val surface=remember(scene) {
@@ -29,6 +31,7 @@ fun Travel3DSurface(scene: SceneGeometry, state: TravelPlaybackState?, calm: Boo
             setRenderer(bridge)
             renderMode=GLSurfaceView.RENDERMODE_WHEN_DIRTY
             addOnLayoutChangeListener { _,_,_,_,_,_,_,_,_ ->
+                bridge.detailWidth=width;bridge.detailHeight=height
                 if(width>0 && height>0) holder.setFixedSize((width*bridge.quality.scale).toInt().coerceAtLeast(1),(height*bridge.quality.scale).toInt().coerceAtLeast(1))
             }
             bridge.onQuality={ scale -> post {
@@ -37,11 +40,13 @@ fun Travel3DSurface(scene: SceneGeometry, state: TravelPlaybackState?, calm: Boo
         }
     }
     SideEffect {
+        bridge.onReady={readyCallback(it)}
         bridge.mapChanged={
             mapStatusCallback(bridge.streetStatus())
+            bufferCallback(bridge.buffering())
             surface.requestRender()
             surface.removeCallbacks(bridge.refresh)
-            surface.postDelayed(bridge.refresh,800)
+            surface.postDelayed(bridge.refresh,400)
         }
         bridge.refreshAction={surface.requestRender()}
     }
@@ -64,6 +69,10 @@ fun Travel3DSurface(scene: SceneGeometry, state: TravelPlaybackState?, calm: Boo
 }
 
 private class SceneBridge(val context: android.content.Context,val scene: SceneGeometry,val onError:(String)->Unit): GLSurfaceView.Renderer {
+    @Volatile var detailWidth=1
+    @Volatile var detailHeight=1
+    var onReady:(Boolean)->Unit={}
+    private var firstFrame=true
     @Volatile var state:TravelPlaybackState?=null
     @Volatile var calm=true
     @Volatile var mapScale=1.0
@@ -73,6 +82,8 @@ private class SceneBridge(val context: android.content.Context,val scene: SceneG
     var mapChanged:()->Unit={}
     var refreshAction:()->Unit={}
     val refresh=Runnable { refreshAction() }
+    private var lastBuffering=false
+    fun buffering()=(streets?.buffering == true) || ((streets?.detailCount ?: 0)>0 && renderer?.mapFrameReady==false)
     fun streetStatus()=streets?.status ?: "Reference map · loading street detail"
     fun updateNetwork() { streets?.setActive(internetMaps && resumed) }
     fun stopNetwork() { streets?.close() }
@@ -84,6 +95,8 @@ private class SceneBridge(val context: android.content.Context,val scene: SceneG
     private val main=android.os.Handler(android.os.Looper.getMainLooper())
     override fun onSurfaceCreated(gl:GL10?,config:EGLConfig?) {
         try {
+            firstFrame=true
+            main.post { onReady(false) }
             streets?.close()
             val session=StreetMapSession(context,network=true) { main.post { mapChanged() } }
             streets=session;updateNetwork()
@@ -95,7 +108,11 @@ private class SceneBridge(val context: android.content.Context,val scene: SceneG
     override fun onDrawFrame(gl:GL10?) {
         try {
             val started=System.nanoTime()
-            renderer?.render(width,height,state,calm,mapScale)
+            renderer?.render(width,height,state,calm,mapScale,maxOf(width,detailWidth),maxOf(height,detailHeight))
+            if(renderer!=null && firstFrame) { firstFrame=false;main.post { onReady(true) } }
+            val waiting=buffering()
+            if(waiting!=lastBuffering) { lastBuffering=waiting;main.post { mapChanged() } }
+            if(waiting) main.postDelayed({ refreshAction() },200)
             val thermal=android.os.Build.VERSION.SDK_INT>=29 && power.currentThermalStatus>=android.os.PowerManager.THERMAL_STATUS_MODERATE
             if(quality.observe((System.nanoTime()-started)/1_000_000.0,thermal)) onQuality(quality.scale)
         }

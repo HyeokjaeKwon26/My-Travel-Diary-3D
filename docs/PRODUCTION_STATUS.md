@@ -1,6 +1,29 @@
-# 1.0.0-rc4 implementation and acceptance status
+# 1.0.0-rc5 implementation and acceptance status
 
 Date: 2026-09-16 (local). Target phone: Galaxy S23 Ultra. The user could not connect the phone during this session. This release candidate can be installed and used, but it is not a declaration that every criterion in the production readiness plan has passed.
+
+## RC5 adaptive journey update
+
+Implemented on `codex/adaptive-journey`:
+
+- At continental scale, draw the globe without the near-coplanar local map mesh. This removes distant-flight depth-buffer checkerboards and stops irrelevant street requests in globe overview. Near views retain the regional/street map.
+- Deterministic north-up camera based on route extent and screen aspect, wider context and longer story time for long movements, overview transitions, smaller playful vehicles and constant-pixel route strokes. Manual scale choices removed.
+- Visual terrain skirts blend uncovered DEM edges back to the reference globe; these are coverage transitions, not measured terrain or edited GPS elevations. Map detail zoom uses actual display resolution even when thermal adaptation reduces internal 3D resolution. North-up reduces atlas padding to avoid wasting texture pixels; road-detail selection uses the available 24-tile budget instead of intentionally magnifying coarse tiles.
+- Display-only dashed gap connectors with UNKNOWN transport and zero recorded distance. Recorded totals stay authoritative; valid horizontal paths survive missing elevation. Time-proven isolated GPS impulses are rejected only in display geometry, preserving untimed out-and-back tracks.
+- Current-viewport map requests prioritize the center and cancel stale requests. Previously cached parent tiles fill detail holes. A shared playback buffer gate pauses movement/photos/music together, waits at most 8 seconds, and has a 20-second retry cooldown. Public OSM route prefetch remains disabled.
+- Export freezes existing street PNGs in an isolated, bounded snapshot before encoding. It never fetches a full route from public OSM. This does not provide detailed cartography in previously unseen areas.
+- Calendar range selection with UTC date conversion. Import progress reports completed work, stage-weighted percentage and a broad ETA; no timer-driven fake progress. Cancellation propagates.
+- Local thumbnail analysis using bundled ML Kit labels, difference hashes, sharpness/exposure and color distributions. Versioned per-media feature cache; one inference at a time. Unknown image content is not treated as a duplicate. Manual representatives survive automatic photo budgets. Card/story quality scoring is shared; day/place coverage and broad content diversity remain explicit selection signals.
+- Compact stacked / wide side-by-side diary layout retains composition through window resizing. Main/player activities handle size/orientation configuration changes. Video output aspect is selected separately from device orientation. The in-app player fits the encoded aspect, preserves its instance across rotation, pauses in the background and restores saved position after recreation.
+- Portrait and landscape H.264 output at 720p/1080p, same-orientation codec fallback, fitted photo/title overlays, encoder progress/ETA.
+
+### RC5 verification
+
+- 310 JVM tests passed; debug/Android-test builds and lint passed. Lint has 0 errors, 86 warnings and 7 informational findings (including existing project findings).
+- Android API 36 functional checks cover the calendar, actual 1280×720 H.264/AAC output, bundled local image labeling and descriptor-cache reuse, and in-app player rotation. Paused playback retained its player instance, position and 16:9 letterboxing.
+- The existing five audio/no-audio export, cancellation, gallery-save and share-intent checks passed. Canceled/completed exports left no temporary map-snapshot directories. Both portrait and landscape output files decoded completely with FFmpeg.
+- Manual 720×1600 / 320 dpi / 150% font and 2560×1600 / 240 dpi screens verified stacked and side-by-side layouts. A paused map seek stayed at 18.7 km when resized from portrait to landscape, with the Play state preserved. These are emulator viewport checks, not hardware performance benchmarks.
+- Production APKs: ARM64 55,836,415 bytes, SHA-256 `c89f422752d66d3263488cf9304b5f8a0441053ce9d5416a82682bf242b2833e`; universal 89,349,625 bytes, SHA-256 `6e2b883f43fadaa25e24f278bf946ff0ebfc42169905d9302982cb5c20a2a3b4`. Both use version code 6 and the original production certificate. Packaged JNI/resource/cartography contracts, signature verification, 16 KiB ZIP alignment and 64-bit ELF load-segment alignment passed. The exact universal production APK installed directly over signed RC4 (code 5 → 6), retained its 31.2 km journey, reopened the mapped playback, and retained the journey again after a forced app process stop/restart. An earlier cold-emulator restart did not retain its just-created fixture, so this signed-update result specifically covers the verified pre-existing fixture and process restart, not power-loss durability. All 16 distinct Android checks passed. The final four affected vehicle/street checks were rerun after the globe correction and passed, including 33 toy poses and the added bright-checkerboard pixel regression for continental/dateline flights. Vehicle pixel checks use an isolated empty street cache so colored real-world map tiles cannot be mistaken for toy paint. Physical S23 Ultra / tablet performance remains unmeasured. The existing original 2D checkout and repository are untouched.
 
 ## RC4 north-up camera and street detail
 

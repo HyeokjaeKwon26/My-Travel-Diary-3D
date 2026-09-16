@@ -242,10 +242,12 @@ class CrossTypeChronologyAndInterleavingTest {
         assertEquals(0, timeline.diagnostics.overlapGeneratedBridgeCount)
 
         // A forward time gap is not evidence of a drivable straight road.
-        assertEquals(2, timeline.episodes.size)
+        assertEquals(3, timeline.episodes.size)
         assertTrue(timeline.episodes[0] is StoryEpisode.MovementEpisode)
-        assertTrue(timeline.episodes[1] is StoryEpisode.VisitEpisode)
-        assertFalse(timeline.episodes.any { it.stableId.contains("bridge") })
+        val connection=timeline.episodes[1] as StoryEpisode.MovementEpisode
+        assertEquals(GeometryProvenance.CONTINUITY_ESTIMATE, connection.segment.geometryProvenance)
+        assertEquals(TransportMode.UNKNOWN, connection.segment.effectiveMode)
+        assertTrue(timeline.episodes[2] is StoryEpisode.VisitEpisode)
 
     }
 }

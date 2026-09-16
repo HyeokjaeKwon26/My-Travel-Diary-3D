@@ -72,7 +72,7 @@ class VehicleAnimationTest {
             for(distance in listOf(.0008,.006,.04,2.8)) {
                 val scale=VehicleAnimation.scale(distance,720,480,mode)
                 val projectedUnit=scale/(distance*sqrt(1.13))*480/(2*tan(Math.toRadians(21.0)))
-                assertTrue(projectedUnit in 20.0..60.0)
+                assertTrue(projectedUnit in 12.0..45.0)
             }
             val a=VehicleAnimation.pose(mode,1.2,.1,.2)
             VehicleAnimation.pose(mode,10.0,-.1,-.2)

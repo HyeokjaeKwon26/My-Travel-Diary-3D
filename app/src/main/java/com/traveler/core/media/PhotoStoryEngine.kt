@@ -33,10 +33,10 @@ object PhotoStoryEngine {
         parentEndEpochMs: Long
     ): Pair<PhotoStoryEligibility, Long> {
         val nameLower = photo.fileName.lowercase()
-        if (nameLower.contains("screenshot") || nameLower.contains("screen_shot") ||
+        if (!photo.isRepresentative && (nameLower.contains("screenshot") || nameLower.contains("screen_shot") ||
             nameLower.contains("screencap") || nameLower.contains("download") ||
             nameLower.contains("received_") || nameLower.contains("thumb") ||
-            nameLower.contains("icon")
+            nameLower.contains("icon"))
         ) {
             return PhotoStoryEligibility.INELIGIBLE_SCREENSHOT_OR_DOWNLOAD to (photo.timestampEpochMs ?: parentStartEpochMs)
         }
@@ -70,42 +70,7 @@ object PhotoStoryEngine {
     /**
      * Scores a photo deterministically for representative ranking within a cluster.
      */
-    fun scorePhotoForRepresentative(photo: MediaItem): Int {
-        var score = 0
-
-        // 1. User manual override (Highest priority)
-        if (photo.isRepresentative) score += 10000
-
-        // 2. Location confidence
-        when (photo.locationConfidence) {
-            LocationConfidenceLevel.GPS_EXACT -> score += 500
-            LocationConfidenceLevel.VISIT_INFERRED -> score += 300
-            LocationConfidenceLevel.TIMELINE_INTERPOLATED -> score += 200
-            else -> Unit
-        }
-
-        // 3. Timestamp confidence
-        when (photo.timestampConfidence) {
-            TimestampConfidence.EXIF_EXACT -> score += 300
-            TimestampConfidence.EXIF_LOCAL -> score += 250
-            TimestampConfidence.MEDIASTORE -> score += 200
-            TimestampConfidence.FILENAME_INFERRED -> score += 100
-            else -> Unit
-        }
-
-        // 4. Photos preferred over videos for static card overlay
-        if (!photo.mimeType.startsWith("video/")) {
-            score += 100
-        }
-
-        // 5. Camera DCIM provenance
-        val pathLower = photo.contentUriString.lowercase()
-        if (pathLower.contains("dcim") || pathLower.contains("camera")) {
-            score += 100
-        }
-
-        return score
-    }
+    fun scorePhotoForRepresentative(photo: MediaItem): Int = RepresentativeMediaSelector.scorePhoto(photo)
 
     /**
      * Clusters eligible media items for a specific visit or movement parent.
@@ -140,7 +105,9 @@ object PhotoStoryEngine {
                 } else 0.0
 
                 // Burst collapse (< 60s) or session clustering (< 3 min and <= 300m)
-                if (timeDiff <= BURST_TIME_WINDOW_MS || (timeDiff <= SESSION_TIME_WINDOW_MS && dist <= CLUSTER_DISTANCE_METERS)) {
+                if (!item.first.isRepresentative && !anchor.first.isRepresentative &&
+                    timeDiff <= SESSION_TIME_WINDOW_MS && dist <= CLUSTER_DISTANCE_METERS &&
+                    RepresentativeMediaSelector.visuallyDuplicate(item.first, anchor.first)) {
                     matchedCluster = cl
                     break
                 }
@@ -384,6 +351,10 @@ object PhotoStoryEngine {
 
         val selectedMoments = mutableListOf<PhotoStoryMoment>()
         val selectedClusterIds = HashSet<String>()
+        // User choices outrank automatic budgets and never collapse into a neighbouring burst.
+        candidateMomentsByCluster.values.filter { it.photo.isRepresentative }.forEach {
+            selectedMoments.add(it);selectedClusterIds.add(it.clusterId)
+        }
 
         // Group visit anchors by calendar day for Day-level fairness (P1-01)
         val visitAnchors = anchors.filter { it.parentType == "VISIT" && it.clusters.isNotEmpty() }
@@ -470,7 +441,13 @@ object PhotoStoryEngine {
 
                 val remainingClusters = anchor.clusters
                     .filter { it.clusterId in candidateMomentsByCluster && it.clusterId !in selectedClusterIds }
-                    .sortedByDescending { scorePhotoForRepresentative(it.representativePhoto) }
+                    .sortedByDescending { cluster ->
+                        val category=cluster.representativePhoto.visualFeatures?.category
+                        val repeated=category!=null && category!="other" && selectedMoments.any {
+                            it.parentId==anchor.parentId && it.photo.visualFeatures?.category==category
+                        }
+                        scorePhotoForRepresentative(cluster.representativePhoto) - if(repeated) 180 else 0
+                    }
 
                 for (cl in remainingClusters) {
                     val currentCountForAnchor = selectedMoments.count { it.parentId == anchor.parentId }
@@ -494,7 +471,8 @@ object PhotoStoryEngine {
                 .sortedByDescending { it.importanceScore }
 
             for (anchor in movementAnchors) {
-                val cl = anchor.clusters.firstOrNull { it.clusterId in candidateMomentsByCluster && it.clusterId !in selectedClusterIds }
+                val cl = anchor.clusters.filter { it.clusterId in candidateMomentsByCluster && it.clusterId !in selectedClusterIds }
+                    .maxByOrNull { scorePhotoForRepresentative(it.representativePhoto) }
                 if (cl != null) {
                     val moment = candidateMomentsByCluster[cl.clusterId]
                     if (moment != null) {

@@ -18,6 +18,7 @@ import com.traveler.core.timeline.SpatialDiscontinuityType
 import com.traveler.core.timeline.TimelineParseStatus
 import com.traveler.data.repository.TripRepositoryImpl
 import com.traveler.domain.repository.TripRepository
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.InputStream
@@ -33,7 +34,8 @@ class CreateTripUseCase(
     private val mediaRepository: MediaRepository,
     private val transportClassifier: TransportClassifier,
     private val tripRepository: TripRepository,
-    private val timezoneResolver: TimezoneResolver = GeoTimezoneEngine
+    private val timezoneResolver: TimezoneResolver = GeoTimezoneEngine,
+    private val analyzePhotos: suspend (List<MediaItem>, (Int,Int)->Unit) -> List<MediaItem> = { photos, _ -> photos }
 ) {
 
     suspend fun execute(
@@ -41,16 +43,23 @@ class CreateTripUseCase(
         startDate: LocalDate,
         endDate: LocalDate,
         customTitle: String? = null,
-        onProgress: ((String) -> Unit)? = null
+        onProgress: ((String) -> Unit)? = null,
+        onWorkProgress: ((ImportProgress) -> Unit)? = null
     ): Trip = withContext(Dispatchers.Default) {
+        fun report(stage: String, fraction: Float, done: Int? = null, total: Int? = null) {
+            onProgress?.invoke(stage)
+            onWorkProgress?.invoke(ImportProgress(stage, fraction, done, total))
+        }
         try {
-            onProgress?.invoke("Reconstructing travel timeline…")
+            report("Reading and reconstructing timeline…", 0f)
 
             // P1-03: Use global timezone-safe ingestion window [UTC+14 .. UTC-12]
             val filter = DateRangeFilter.forLocalDateRange(startDate, endDate)
 
             // 1. Parse Timeline JSON with wide date range filter (P1-02: interval overlap semantics)
             val parseResult = locationHistorySource.parse(timelineStream, filter)
+
+            report("Validating recorded routes…", .12f)
 
             // Explicit parse error check - fail early on fatal malformed or unsupported inputs
             if (parseResult.status == TimelineParseStatus.FATAL_UNSUPPORTED_FORMAT) {
@@ -129,9 +138,13 @@ class CreateTripUseCase(
             )
 
             // 3. Precompute timezones asynchronously in background for visits & movement endpoints & apply durable VISIT_NAME
-            onProgress?.invoke("Preparing offline timezone data…")
+            report("Preparing offline timezone data…", .18f)
             var engineInitFailureReason: String? = null
+            val timezoneTotal = parseResult.visits.size + canonicalSegments.size
+            var timezoneDone = 0
             val rawVisitsWithTimezones = parseResult.visits.map { v ->
+                kotlinx.coroutines.currentCoroutineContext().ensureActive()
+                report("Resolving place timezones…", .18f + .14f * timezoneDone++ / maxOf(1,timezoneTotal), timezoneDone, timezoneTotal)
                 val durableNameOverride = durableOverrides[Pair("VISIT_NAME", v.id)]?.overrideValue
                 val effectivePlaceName = durableNameOverride ?: v.placeName
                 val isOverridden = durableNameOverride != null || v.isUserOverride
@@ -145,6 +158,8 @@ class CreateTripUseCase(
             val visitsWithTimezones = CanonicalVisitTimelineValidator.requireNonOverlapping(rawVisitsWithTimezones)
 
             val segmentsWithTimezones = canonicalSegments.map { s ->
+                kotlinx.coroutines.currentCoroutineContext().ensureActive()
+                report("Resolving route timezones…", .18f + .14f * timezoneDone++ / maxOf(1,timezoneTotal), timezoneDone, timezoneTotal)
                 val startRes = if (s.startTimezoneId != null) null else timezoneResolver.resolve(s.startPoint)
                 val endRes = if (s.endTimezoneId != null) null else timezoneResolver.resolve(s.endPoint)
                 if (startRes is TimezoneResolution.EngineInitializationFailure) engineInitFailureReason = startRes.reason
@@ -167,24 +182,31 @@ class CreateTripUseCase(
                 .distinct()
 
             // 4. Query MediaStore for raw media candidates with diagnostics (P0-01)
-            val scanResult = mediaRepository.queryMediaWithDiagnostics(filter.startEpochMs, filter.endEpochMs)
+            report("Scanning photo and video metadata…", .32f)
+            val scanResult = mediaRepository.queryMediaWithProgress(filter.startEpochMs, filter.endEpochMs) { done, total, fraction ->
+                report("Scanning photo and video metadata…", .32f + .25f*fraction, done, total)
+            }
             val rawCandidates = scanResult.candidates
             val initDiag = scanResult.diagnostics
 
             // 5. Precompute photo direct GPS timezones asynchronously
-            val enrichedCandidates = rawCandidates.map { candidate ->
+            val enrichedCandidates = rawCandidates.mapIndexed { index, candidate ->
+                kotlinx.coroutines.currentCoroutineContext().ensureActive()
+                report("Resolving photo locations…", .57f + .13f*index/maxOf(1,rawCandidates.size), index, rawCandidates.size)
                 val gpsZone = candidate.directGps?.let { timezoneResolver.resolve(it).zoneIdOrNull?.id }
                 candidate.copy(directGpsZoneId = gpsZone)
             }
 
             // 6. Contextually resolve timestamps using pure PhotoTimestampResolver
-            onProgress?.invoke("Matching photos…")
+            report("Matching photos…", .70f)
             var exifCount = 0
             var fallbackCount = 0
             var unresolvedCount = 0
             var gpsExactCount = 0
 
-            val mediaItems = enrichedCandidates.map { candidate ->
+            val mediaItems = enrichedCandidates.mapIndexed { index, candidate ->
+                kotlinx.coroutines.currentCoroutineContext().ensureActive()
+                report("Matching photo times…", .70f + .12f*index/maxOf(1,enrichedCandidates.size), index, enrichedCandidates.size)
                 if (candidate.directGps != null) gpsExactCount++
                 val resolvedTime = PhotoTimestampResolver.resolve(
                     candidate = candidate,
@@ -223,9 +245,13 @@ class CreateTripUseCase(
                 )
             }
 
+            val analyzedMedia = analyzePhotos(mediaItems) { done,total ->
+                report("Choosing memories on this device…", .82f + .13f*done/maxOf(1,total), done,total)
+            }
+            report("Organizing days and selecting memories…", .95f)
             // 7. Match photos with places & movement segments (O(M log N) binary interval search)
             val matchedMediaItems = PhotoLocationMatcher.matchPhotos(
-                photos = mediaItems,
+                photos = analyzedMedia,
                 visits = visitsWithTimezones,
                 segments = segmentsWithTimezones,
                 rawPoints = parseResult.rawLocationPoints
@@ -461,8 +487,9 @@ class CreateTripUseCase(
             )
 
             // Save trip to Room database
-            onProgress?.invoke("Saving travel story…")
+            report("Saving travel story…", .98f)
             tripRepository.saveTrip(trip)
+            report("Travel story saved", 1f)
 
             trip
         } finally {

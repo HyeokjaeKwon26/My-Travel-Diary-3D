@@ -101,7 +101,7 @@ class StreetMapAndroidTest {
         val root=File(context.cacheDir,"street-render-test-${System.nanoTime()}").apply { mkdirs() }
         val center=GeoPoint(37.79,-122.43)
         val world=WebMercator.project(center)
-        for(z in 13..17) {
+        for(z in 8..17) {
             val n=1 shl z;val x=(world.x*n).toInt();val y=(world.y*n).toInt()
             for(dx in -3..3) for(dy in -3..3) store(root,StreetTile(z,x+dx,y+dy),System.currentTimeMillis()+86400_000)
         }

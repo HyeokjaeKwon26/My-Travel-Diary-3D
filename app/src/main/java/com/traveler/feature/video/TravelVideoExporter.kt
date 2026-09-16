@@ -95,6 +95,8 @@ object TravelVideoExporter {
         val safeTrip = if (generalizeHomeAddress) trip.copy(title = com.traveler.feature.video.ExportPrivacy.label(trip.title)) else trip
         val timeline = buildExportTimeline(safeTrip, safeModel, profile)
         val terrain = com.traveler.core.terrain.JourneyTerrain.load(context,renderModel)
+        val frozenMaps=ExportMapSnapshot.create(context) { onProgress?.invoke(it*.03f) }
+        try {
         val basemapStream = context.assets.open("basemap_world.json")
         val renderer = TravelVideoRenderer(
             context = context,
@@ -102,7 +104,8 @@ object TravelVideoExporter {
             renderModel = safeModel,
             timeline = timeline,
             generalizeHomeAddress = generalizeHomeAddress,
-            sceneGeometry = com.traveler.feature.map.threed.SceneGeometry(safeModel, timeline, terrain)
+            sceneGeometry = com.traveler.feature.map.threed.SceneGeometry(safeModel, timeline, terrain),
+            streetCacheDirectory = frozenMaps
         )
         val tempDir = getExportTempDir(context)
         val sanitizedTitle = trip.title.replace(Regex("[^a-zA-Z0-9_-]"), "_")
@@ -122,7 +125,7 @@ object TravelVideoExporter {
             height = actualResolution.height,
             fps = 30,
             includeMusic = includeMusic,
-            onProgress = onProgress
+            onProgress = { onProgress?.invoke(.03f+it*.96f) }
         )
 
         if (success && tempFile.exists() && tempFile.length() > 1024) {
@@ -147,11 +150,13 @@ object TravelVideoExporter {
                 throw IllegalStateException("Video export timing validation failed: intended $intendedDurationSeconds s, but container reported $actualDurationSeconds s")
             }
 
+            onProgress?.invoke(1f)
             tempFile
         } else {
             if (tempFile.exists()) tempFile.delete()
             null
         }
+        } finally { ExportMapSnapshot.clear(frozenMaps) }
     }
 
     /**

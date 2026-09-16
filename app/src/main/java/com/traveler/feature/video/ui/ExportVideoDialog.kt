@@ -31,11 +31,12 @@ import java.io.File
 
 sealed interface VideoExportState {
     object Idle : VideoExportState
-    data class Encoding(val progress: Float) : VideoExportState
+    data class Encoding(val progress: Float, val startedMs: Long = android.os.SystemClock.elapsedRealtime()) : VideoExportState
     data class Ready(val videoFile: File, val durationSeconds: Float, val isSavedToGallery: Boolean = false) : VideoExportState
     data class Error(val message: String) : VideoExportState
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun ExportVideoDialog(
     trip: Trip,
@@ -108,7 +109,8 @@ fun ExportVideoDialog(
             shape = RoundedCornerShape(16.dp),
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
             modifier = Modifier
-                .fillMaxWidth(0.92f)
+                .widthIn(max = 640.dp)
+                .fillMaxWidth(0.96f)
                 .wrapContentHeight()
                 .padding(16.dp)
         ) {
@@ -126,7 +128,7 @@ fun ExportVideoDialog(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
+                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
                         Icon(Icons.Default.PlayArrow, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
@@ -145,17 +147,22 @@ fun ExportVideoDialog(
                 when (val state = exportState) {
                     is VideoExportState.Idle -> {
                         Text(
-                            text = "Select a video length profile to create a cinematic 9:16 travel video with map routes, photos, and music.",
+                            text = "Select a video length profile to create a travel video with map routes, photos, and music.",
                             fontSize = 13.sp,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
 
-                        Row {
-                            com.traveler.feature.video.VideoResolution.values().forEach { option ->
+                        FlowRow {
+                            com.traveler.feature.video.VideoResolution.values().filter { it.landscape == resolution.landscape }.forEach { option ->
                                 FilterChip(selected=resolution==option,onClick={resolution=option},label={Text(option.label)},modifier=Modifier.padding(end=8.dp))
                             }
                         }
+                        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            FilterChip(selected = !resolution.landscape, onClick = { resolution = resolution.oriented(false) }, label = { Text("Portrait 9:16") })
+                            FilterChip(selected = resolution.landscape, onClick = { resolution = resolution.oriented(true) }, label = { Text("Landscape 16:9") })
+                        }
                         Text("1080p uses 720p if the device encoder requires it. Terrain uses regions already saved on this phone.",fontSize=11.sp)
+                        Text("Map detail is frozen from this phone’s cache before export. Areas not viewed online use the simpler reference map; the video does not download a full journey map.", fontSize=12.sp)
                         // Length Profiles
                         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                             ProfileOptionCard(
@@ -238,7 +245,8 @@ fun ExportVideoDialog(
                                         generalizeHomeAddress = generalizeHomeAddress,
                                         encoderRef = { enc -> currentEncoder = enc },
                                         onProgress = { p ->
-                                            exportState = VideoExportState.Encoding(p)
+                                            val started = (exportState as? VideoExportState.Encoding)?.startedMs ?: android.os.SystemClock.elapsedRealtime()
+                                            if (exportJob?.isActive == true) exportState = VideoExportState.Encoding(p, started)
                                         }
                                     )
                                     if (file != null) {
@@ -284,6 +292,11 @@ fun ExportVideoDialog(
                                 color = MaterialTheme.colorScheme.primary
                             )
 
+                            val estimator = remember(state.startedMs) { com.traveler.domain.usecase.ImportProgressEstimator(state.startedMs) }
+                            var now by remember { mutableStateOf(android.os.SystemClock.elapsedRealtime()) }
+                            LaunchedEffect(state.startedMs) { while(true) { kotlinx.coroutines.delay(1000);now=android.os.SystemClock.elapsedRealtime() } }
+                            Text(if(state.progress < .03f) "Preparing saved map detail…" else estimator.remaining(
+                                com.traveler.domain.usecase.ImportProgress("Encoding",state.progress),now),fontSize=12.sp)
                             Spacer(modifier = Modifier.height(8.dp))
                             OutlinedButton(
                                 onClick = {
@@ -336,20 +349,8 @@ fun ExportVideoDialog(
 
                             OutlinedButton(
                                 onClick = {
-                                    val contentUri = androidx.core.content.FileProvider.getUriForFile(
-                                        context,
-                                        "${context.packageName}.fileprovider",
-                                        state.videoFile
-                                    )
-                                    val viewIntent = android.content.Intent(android.content.Intent.ACTION_VIEW).apply {
-                                        setDataAndType(contentUri, "video/mp4")
-                                        addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                                    }
-                                    try {
-                                        context.startActivity(viewIntent)
-                                    } catch (_: Exception) {
-                                        Toast.makeText(context, "No video player application found", Toast.LENGTH_SHORT).show()
-                                    }
+                                    context.startActivity(android.content.Intent(context, com.traveler.feature.video.VideoPlayerActivity::class.java)
+                                        .putExtra("videoPath", state.videoFile.absolutePath))
                                 },
                                 modifier = Modifier.fillMaxWidth()
                             ) {
@@ -434,10 +435,9 @@ private fun ProfileOptionCard(
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
             Column(modifier = Modifier.weight(1f)) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
+                Column {
                     Text(title, fontWeight = FontWeight.Bold, fontSize = 14.sp)
                     if (isRecommended) {
-                        Spacer(modifier = Modifier.width(6.dp))
                         Text(
                             "Recommended",
                             fontSize = 10.sp,
