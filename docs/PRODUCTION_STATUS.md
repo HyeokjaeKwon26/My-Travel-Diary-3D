@@ -1,6 +1,21 @@
-# 1.0.0-rc1 implementation and acceptance status
+# 1.0.0-rc2 implementation and acceptance status
 
 Date: 2026-09-15. Target phone: Galaxy S23 Ultra. The user could not connect the phone during this session. This release candidate can be installed and used, but it is not a declaration that every criterion in the production readiness plan has passed.
+
+## RC2 map correction
+
+The user's S23 Ultra screenshot showed an opaque brown terrain surface with only the route and vehicle visible. RC1 rendered elevation meshes without cartography and covered its low-resolution globe texture. RC2 drapes bundled land/water, regional roads, rivers, urban areas and place labels over the elevation mesh. A local base surface keeps cartography visible when no DEM is stored. The globe coordinate handedness was also corrected so east/west and map text are no longer mirrored.
+
+Map data uses a preprojected binary cache and one 2048×2048 local texture (16 MiB on the GPU), refreshed when the camera leaves its central area or zoom changes. It works offline and is shared by playback and video export. Natural Earth is a regional reference map, not a complete street map or road-matching service. APK version code 3 uses the same release signing key as RC1.
+
+### RC2 verification
+
+- 296 JVM unit tests passed, including geographic east/right and heading orientation regression coverage.
+- Five Android tests passed: isolated GLES pixel checks for San Francisco with/without elevation and inland Phoenix roads/labels, plus the three existing 3D journey/playback/export/persistence checks. Wi-Fi was disabled and airplane mode was enabled.
+- The new tests caught both the initial missing packaged asset name and insufficient road contrast; the final build passed after fixing these. The exported Grand Canyon MP4 decoded completely with FFmpeg.
+- Final optimized, signed APK: 43,801,381 bytes; SHA-256 `250e1193c40ee8ecc0b2d8bb33c2c7143a1b66d77bd4106b664602d61ff2e71c`. Packaged JNI/resource/cartography checks passed; lint has 0 errors and 85 warnings.
+- Installed signed RC1, saved a sample journey, installed RC2 directly over it, and reopened the retained 31.2 km journey and played its mapped 3D terrain offline. [Final signed-app capture](verification-3d/rc2-signed-play.png).
+- Earlier emulator screenshots included System UI/Pixel Launcher non-response dialogs and are not used as clean visual evidence. The final signed-app capture was taken after restarting the emulator and dismissing the external system dialog. These emulator checks remain functional evidence, not physical-phone performance acceptance.
 
 ## Implemented
 
@@ -12,7 +27,7 @@ Date: 2026-09-15. Target phone: Galaxy S23 Ultra. The user could not connect the
 - Journey backup/restore with bounded input and local media reference validation. Production signing and release shrink/obfuscation. Original 2D repository and app identity preserved.
 - Offline source credits and updated privacy/installation documentation.
 
-## Verification
+## RC1 verification history
 
 - JVM unit tests: 295 passed, 0 failures/errors.
 - Android API 36 emulator: all 17 terrain/cache, 3D, video and Room migration tests passed. Five affected integration cases were rerun after final cache and audio-test changes; all passed.

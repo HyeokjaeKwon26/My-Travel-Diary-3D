@@ -6,6 +6,8 @@ import android.opengl.GLES20 as GL
 import android.opengl.GLUtils
 import android.opengl.Matrix
 import com.traveler.core.common.geo.GeoPoint
+import com.traveler.core.common.geo.WebMercator
+import com.traveler.core.common.geo.WorldPoint
 import com.traveler.core.model.TransportMode
 import com.traveler.feature.map.renderer.TravelPlaybackState
 import java.nio.ByteBuffer
@@ -17,6 +19,12 @@ import kotlin.math.*
 class TravelGlRenderer(private val context: Context, val scene: SceneGeometry) {
     private var program = 0
     private var texture = 0
+    private var mapTexture = 0
+    private lateinit var mapDrape: OfflineMapDrape
+    private var mapWindow: OfflineMapDrape.Window? = null
+    private var localBase: Mesh? = null
+    private var mapBoundsUniform = 0
+    private var mapTextureUniform = 0
     private val projection = FloatArray(16)
     private val view = FloatArray(16)
     private val matrix = FloatArray(16)
@@ -31,13 +39,31 @@ class TravelGlRenderer(private val context: Context, val scene: SceneGeometry) {
     fun initialize() {
         val vs = shader(GL.GL_VERTEX_SHADER,"""
             uniform mat4 uMatrix; attribute vec3 aPosition; attribute vec4 aColor; attribute vec2 aUv;
-            varying vec4 vColor; varying vec2 vUv;
-            void main(){ gl_Position=uMatrix*vec4(aPosition,1.0); vColor=aColor; vUv=aUv; }
+            uniform mediump float uUseTexture; uniform vec4 uMapBounds;
+            varying vec4 vColor; varying vec2 vUv; varying vec2 vGlobeUv;
+            void main(){
+                gl_Position=uMatrix*vec4(aPosition,1.0); vColor=aColor; vUv=aUv; vGlobeUv=aUv;
+                if(uUseTexture>1.5){
+                    float dx=aUv.x-uMapBounds.x;
+                    dx-=floor(dx+0.5);
+                    vUv=vec2(dx,aUv.y-uMapBounds.y)*uMapBounds.z;
+                    float lat=2.0*atan(exp(3.14159265*(1.0-2.0*aUv.y)))-1.57079633;
+                    vGlobeUv=vec2(aUv.x,0.5-lat/3.14159265);
+                }
+            }
         """.trimIndent())
         val fs = shader(GL.GL_FRAGMENT_SHADER,"""
-            precision mediump float; varying vec4 vColor; varying vec2 vUv;
-            uniform sampler2D uTexture; uniform float uUseTexture; uniform float uAlpha;
-            void main(){ vec4 c=mix(vColor,texture2D(uTexture,vUv)*vColor,uUseTexture); gl_FragColor=vec4(c.rgb,c.a*uAlpha); }
+            precision mediump float; varying vec4 vColor; varying vec2 vUv; varying vec2 vGlobeUv;
+            uniform sampler2D uTexture; uniform sampler2D uMapTexture;
+            uniform float uUseTexture; uniform float uAlpha;
+            void main(){
+                vec4 c=vColor;
+                if(uUseTexture>1.5){
+                    bool inside=vUv.x>=0.0 && vUv.x<=1.0 && vUv.y>=0.0 && vUv.y<=1.0;
+                    c*=inside ? texture2D(uMapTexture,vUv) : texture2D(uTexture,vGlobeUv);
+                } else if(uUseTexture>0.5) c*=texture2D(uTexture,vUv);
+                gl_FragColor=vec4(c.rgb,c.a*uAlpha);
+            }
         """.trimIndent())
         program=GL.glCreateProgram(); GL.glAttachShader(program,vs); GL.glAttachShader(program,fs); GL.glLinkProgram(program)
         val status=IntArray(1); GL.glGetProgramiv(program,GL.GL_LINK_STATUS,status,0)
@@ -47,6 +73,8 @@ class TravelGlRenderer(private val context: Context, val scene: SceneGeometry) {
         uvAttribute=GL.glGetAttribLocation(program,"aUv"); matrixUniform=GL.glGetUniformLocation(program,"uMatrix")
         textureUniform=GL.glGetUniformLocation(program,"uTexture"); useTextureUniform=GL.glGetUniformLocation(program,"uUseTexture")
         alphaUniform=GL.glGetUniformLocation(program,"uAlpha")
+        mapBoundsUniform=GL.glGetUniformLocation(program,"uMapBounds")
+        mapTextureUniform=GL.glGetUniformLocation(program,"uMapTexture")
         val ids=IntArray(1); GL.glGenTextures(1,ids,0); texture=ids[0]
         GL.glBindTexture(GL.GL_TEXTURE_2D,texture)
         GL.glTexParameteri(GL.GL_TEXTURE_2D,GL.GL_TEXTURE_MIN_FILTER,GL.GL_LINEAR)
@@ -57,10 +85,17 @@ class TravelGlRenderer(private val context: Context, val scene: SceneGeometry) {
             val bmp=BitmapFactory.decodeStream(it) ?: error("World texture unavailable")
             GLUtils.texImage2D(GL.GL_TEXTURE_2D,0,bmp,0); bmp.recycle()
         }
+        mapDrape=OfflineMapDrape(context)
+        GL.glGenTextures(1,ids,0);mapTexture=ids[0]
+        GL.glBindTexture(GL.GL_TEXTURE_2D,mapTexture)
+        GL.glTexParameteri(GL.GL_TEXTURE_2D,GL.GL_TEXTURE_MIN_FILTER,GL.GL_LINEAR)
+        GL.glTexParameteri(GL.GL_TEXTURE_2D,GL.GL_TEXTURE_MAG_FILTER,GL.GL_LINEAR)
+        GL.glTexParameteri(GL.GL_TEXTURE_2D,GL.GL_TEXTURE_WRAP_S,GL.GL_CLAMP_TO_EDGE)
+        GL.glTexParameteri(GL.GL_TEXTURE_2D,GL.GL_TEXTURE_WRAP_T,GL.GL_CLAMP_TO_EDGE)
         world=buildWorld()
         routes=scene.routes.map { route ->
             val values=ArrayList<Float>()
-            val color=if(route.mode==TransportMode.AIRPLANE) floatArrayOf(.74f,.64f,1f,1f) else floatArrayOf(.25f,.94f,.89f,1f)
+            val color=if(route.mode==TransportMode.AIRPLANE) floatArrayOf(.74f,.64f,1f,1f) else floatArrayOf(.02f,.48f,.52f,1f)
             for(i in 0 until route.xyz.lastIndex) if(!route.uncertainEdges[i]) {
                 val a=route.xyz[i]; val b=route.xyz[i+1]
                 if(route.mode==TransportMode.AIRPLANE) {
@@ -97,7 +132,7 @@ class TravelGlRenderer(private val context: Context, val scene: SceneGeometry) {
         var eye=focus+up*(distance*.8)-forward*(distance*.7)
         if(distance<.1) {
             val radial=eye.unit()
-            val eyePoint=GeoPoint(Math.toDegrees(asin(radial.y)),Math.toDegrees(atan2(radial.z,radial.x)))
+            val eyePoint=GeoPoint(Math.toDegrees(asin(radial.y)),Math.toDegrees(atan2(-radial.z,radial.x)))
             val floor=scene.ground(eyePoint)
             if(floor!=null && (eye.length()-1)*EarthGeometry.R<floor+200) eye=radial*(1+(floor+200)/EarthGeometry.R)
         }
@@ -107,16 +142,18 @@ class TravelGlRenderer(private val context: Context, val scene: SceneGeometry) {
         Matrix.multiplyMM(matrix,0,projection,0,view,0)
         GL.glUseProgram(program); GL.glUniformMatrix4fv(matrixUniform,1,false,matrix,0)
         GL.glActiveTexture(GL.GL_TEXTURE0); GL.glBindTexture(GL.GL_TEXTURE_2D,texture); GL.glUniform1i(textureUniform,0)
-        world?.let { draw(it,GL.GL_TRIANGLES,1f,true) }
+        world?.let { draw(it,GL.GL_TRIANGLES,1f,1) }
         if(distance<.1) {
-            val center=GeoPoint(Math.toDegrees(asin(up.y)),Math.toDegrees(atan2(up.z,up.x)))
+            val center=GeoPoint(Math.toDegrees(asin(up.y)),Math.toDegrees(atan2(-up.z,up.x)))
+            updateMap(center,distance,width.toDouble()/max(1,height))
+            localBase?.let { draw(it,GL.GL_TRIANGLES,1f,2) }
             val nearby=scene.packs.indices.sortedBy { i ->
                 val p=scene.packs[i]
                 com.traveler.core.common.geo.GeodesicUtils.distanceMeters(center,
                     GeoPoint(center.latitude.coerceIn(p.south,p.north),center.longitude.coerceIn(p.west,p.east)))
             }.take(12).toSet()
             terrain.keys.toList().filter { it !in nearby }.forEach { terrain.remove(it) }
-            for(i in nearby) draw(terrain.getOrPut(i) { buildTerrain(scene.packs[i]) },GL.GL_TRIANGLES)
+            for(i in nearby) draw(terrain.getOrPut(i) { buildTerrain(scene.packs[i]) },GL.GL_TRIANGLES,1f,2)
         }
         // Do not show future / return paths over the current journey during playback.
         routes.forEachIndexed { i,mesh ->
@@ -170,6 +207,11 @@ class TravelGlRenderer(private val context: Context, val scene: SceneGeometry) {
 
     private fun buildTerrain(pack:com.traveler.core.terrain.TerrainPack):Mesh {
             val values=ArrayList<Float>()
+            // Local daylight keeps a flat map equally legible on every continent.
+            // A fixed Earth-space light made North American maps uniformly dark.
+            val midpoint=GeoPoint((pack.north+pack.south)/2,(pack.west+pack.east)/2)
+            val light=(EarthGeometry.position(midpoint).unit()+EarthGeometry.north(midpoint)*.6+
+                EarthGeometry.forward(midpoint,90.0)*.8).unit()
             // Bound mesh size even for a maximum-size imported pack.
             val step=max(1,(max(pack.rows,pack.columns)-1)/128)
             for(r in 0 until pack.rows-1 step step) for(c in 0 until pack.columns-1 step step) {
@@ -185,11 +227,10 @@ class TravelGlRenderer(private val context: Context, val scene: SceneGeometry) {
                     val xyz=ps.map { EarthGeometry.position(it.first,it.second) }
                     var normal=(xyz[1]-xyz[0]).cross(xyz[2]-xyz[0]).unit()
                     if(normal.x*xyz[0].x+normal.y*xyz[0].y+normal.z*xyz[0].z<0) normal=normal*-1.0
-                    val light=Vec3(-.3,.8,-.5).unit()
-                    val shade=(.5+.5*abs(normal.x*light.x+normal.y*light.y+normal.z*light.z)).toFloat()
+                    val shade=(.78+.32*max(0.0,normal.x*light.x+normal.y*light.y+normal.z*light.z)).toFloat()
                     ps.forEachIndexed { i,ph ->
-                        val t=((ph.second-650)/2200).coerceIn(0.0,1.0).toFloat()
-                        vertex(values,xyz[i],floatArrayOf((.65f-.22f*t)*shade,(.34f+.2f*t)*shade,(.22f+.12f*t)*shade,1f))
+                        val uv=WebMercator.project(ph.first)
+                        vertex(values,xyz[i],floatArrayOf(shade,shade,shade,1f),uv.x.toFloat(),uv.y.toFloat())
                     }
                 }
                 triangle(listOf(a,b,d)); triangle(listOf(d,b,e))
@@ -197,9 +238,37 @@ class TravelGlRenderer(private val context: Context, val scene: SceneGeometry) {
             return mesh(values)
     }
 
-    private fun draw(m:Mesh,mode:Int,alpha:Float=1f,textured:Boolean=false) {
+    private fun updateMap(center:GeoPoint,distance:Double,aspect:Double) {
+        val wanted=mapDrape.window(center.latitude,center.longitude,distance,aspect)
+        val p=WebMercator.project(center)
+        GL.glActiveTexture(GL.GL_TEXTURE1);GL.glBindTexture(GL.GL_TEXTURE_2D,mapTexture)
+        if(mapWindow?.containsCenter(p.x,p.y,wanted.span)!=true) {
+            val bitmap=mapDrape.rasterize(wanted)
+            try { GLUtils.texImage2D(GL.GL_TEXTURE_2D,0,bitmap,0) } finally { bitmap.recycle() }
+            mapWindow=wanted
+            // A finely tessellated base stays visible even with no downloaded DEM.
+            // The coarse globe's triangles can sit kilometres below the local surface.
+            val values=ArrayList<Float>()
+            fun add(r:Int,c:Int) {
+                val x=wanted.x+wanted.span*c/64;val y=(wanted.y+wanted.span*r/64).coerceIn(0.0,1.0)
+                val geo=WebMercator.unproject(WorldPoint(x-floor(x),y))
+                vertex(values,EarthGeometry.position(geo,-500.0),floatArrayOf(1f,1f,1f,1f),
+                    (x-floor(x)).toFloat(),y.toFloat())
+            }
+            for(r in 0 until 64) for(c in 0 until 64) {
+                add(r,c);add(r+1,c);add(r,c+1);add(r,c+1);add(r+1,c);add(r+1,c+1)
+            }
+            localBase=mesh(values)
+        }
+        val w=mapWindow!!
+        GL.glUniform4f(mapBoundsUniform,w.x.toFloat(),w.y.toFloat(),(1/w.span).toFloat(),0f)
+        GL.glUniform1i(mapTextureUniform,1)
+        GL.glActiveTexture(GL.GL_TEXTURE0)
+    }
+
+    private fun draw(m:Mesh,mode:Int,alpha:Float=1f,textured:Int=0) {
         if(m.count==0) return
-        GL.glUniform1f(useTextureUniform,if(textured) 1f else 0f);GL.glUniform1f(alphaUniform,alpha)
+        GL.glUniform1f(useTextureUniform,textured.toFloat());GL.glUniform1f(alphaUniform,alpha)
         m.data.position(0);GL.glEnableVertexAttribArray(positionAttribute);GL.glVertexAttribPointer(positionAttribute,3,GL.GL_FLOAT,false,36,m.data)
         m.data.position(3);GL.glEnableVertexAttribArray(colorAttribute);GL.glVertexAttribPointer(colorAttribute,4,GL.GL_FLOAT,false,36,m.data)
         m.data.position(7);GL.glEnableVertexAttribArray(uvAttribute);GL.glVertexAttribPointer(uvAttribute,2,GL.GL_FLOAT,false,36,m.data)
@@ -227,5 +296,5 @@ class TravelGlRenderer(private val context: Context, val scene: SceneGeometry) {
         val status=IntArray(1);GL.glGetShaderiv(id,GL.GL_COMPILE_STATUS,status,0)
         check(status[0]!=0) { GL.glGetShaderInfoLog(id) };return id
     }
-    fun release() { terrain.clear();routes=emptyList();world=null;if(program!=0) GL.glDeleteProgram(program);if(texture!=0) GL.glDeleteTextures(1,intArrayOf(texture),0);program=0;texture=0 }
+    fun release() { terrain.clear();routes=emptyList();world=null;localBase=null;mapWindow=null;if(program!=0) GL.glDeleteProgram(program);GL.glDeleteTextures(2,intArrayOf(texture,mapTexture),0);program=0;texture=0;mapTexture=0 }
 }

@@ -1,0 +1,9 @@
+
+com.traveler.feature.map.MapDrapeAndroidTest:..
+com.traveler.feature.map.ThreeDIntegrationTest:...
+
+Time: 84.636
+
+OK (5 tests)
+
+

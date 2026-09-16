@@ -65,4 +65,6 @@ if __name__ == "__main__":
             assert fields.get(name) == "J", f"Native long field missing or renamed: {name}"
         assert wkid is not None, "ESRI Wkid package moved away from its relative resources"
         assert "com/esri/core/geometry/gcs_tolerances.txt" in apk.namelist(), "ESRI coordinate-system data missing"
-    print("Release contracts passed: native fields and ESRI resource lookup preserved")
+        with apk.open("assets/basemap_3d.bin") as basemap:
+            assert basemap.read(8) == b"MAP3\x00\x00\x00\x01", "Bundled 3D cartography missing or invalid"
+    print("Release contracts passed: native fields, ESRI resources, bundled 3D cartography")
