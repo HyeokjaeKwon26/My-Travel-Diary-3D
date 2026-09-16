@@ -35,7 +35,7 @@ class TripCardAndroidTest {
     private val start = Instant.parse("2026-07-01T20:00:00Z").toEpochMilli()
     private fun trip(id: String) = Trip(id, "Saved journey", "2026-07-01", "2026-07-03", 123_000.0,
         cities = listOf("Home"), totalMediaCount = 30)
-    private fun visit(id: String, name: String?) = Visit(id, name, location = GeoPoint(42.0, -71.0),
+    private fun visit(id: String, name: String?) = Visit(id, name, location = GeoPoint(42.3601, -71.0589),
         startTimestampEpochMs = start, endTimestampEpochMs = start + 86_400_000, timezoneId = "UTC")
 
     @Test fun legacyTripsUseAllVisitsAndDurableRenamesRefreshEveryCard() = runBlocking {
@@ -54,7 +54,9 @@ class TripCardAndroidTest {
             try {
                 val initial = withTimeout(10_000) { updates.receive() }.associateBy { it.id }
                 assertEquals(8, initial.getValue("a").visitSummary.visitCount)
-                assertTrue(initial.getValue("a").visitSummary.representativeNames.isEmpty())
+                assertEquals(listOf("Boston 인근"), initial.getValue("a").visitSummary.representativeNames)
+                assertTrue(initial.getValue("a").visitSummary.hasApproximateRegions)
+                assertEquals(0, initial.getValue("a").visitSummary.unresolvedVisitCount)
                 assertEquals(0, initial.getValue("empty").visitSummary.visitCount)
                 assertTrue(initial.getValue("a").days.isEmpty())
                 repository.updateVisitName("a", "v2", "Niagara Falls")
@@ -67,7 +69,7 @@ class TripCardAndroidTest {
                 }
                 assertEquals(8, renamed.getValue("a").visitSummary.visitCount)
                 assertEquals(6, renamed.getValue("a").visitSummary.unnamedVisitCount)
-                assertEquals(listOf("Niagara Falls", "Home"), renamed.getValue("a").visitSummary.representativeNames)
+                assertEquals(listOf("Niagara Falls", "Boston 인근"), renamed.getValue("a").visitSummary.representativeNames)
                 assertEquals(repository.getTripById("a")!!.visitSummary, renamed.getValue("a").visitSummary)
                 assertEquals(repository.getTripById("b")!!.visitSummary, renamed.getValue("b").visitSummary)
                 // Legacy cache stays untouched: the new card derives its answer from visits.
@@ -119,6 +121,74 @@ class TripCardAndroidTest {
         compose.onNodeWithContentDescription("Delete").assertIsDisplayed()
         compose.waitForIdle()
         assertTrue(UiDevice.getInstance(InstrumentationRegistry.getInstrumentation()).takeScreenshot(
-            File(context.getExternalFilesDir(null), "rc8-card-large-font.png")))
+            File(context.getExternalFilesDir(null), "rc9-card-large-font.png")))
+    }
+
+    @Test fun unnamedLegacyJourneyShowsOfflineRegionsAndKeepsRawNames() = runBlocking {
+        val db = Room.inMemoryDatabaseBuilder(context, TravelerDatabase::class.java).build()
+        try {
+            val repository = TripRepositoryImpl(db)
+            val stops = listOf(
+                visit("home", "Home"),
+                visit("vegas", null).copy(location = GeoPoint(36.1699, -115.1398)),
+                visit("canyon", null).copy(location = GeoPoint(36.1069, -112.1129)),
+                visit("niagara", null).copy(location = GeoPoint(43.0962, -79.0377)),
+                visit("remote", null).copy(location = GeoPoint(0.0, -140.0))
+            ).mapIndexed { index, stop -> stop.copy(
+                startTimestampEpochMs = stop.startTimestampEpochMs + index * 1000L,
+                endTimestampEpochMs = stop.endTimestampEpochMs + index * 1000L
+            ) }
+            repository.saveTrip(trip("offline").copy(days = listOf(TripDay(1, "2026-07-01",
+                items = stops.map { TripDayItem.VisitItem(it) }))))
+            val card = repository.getAllTrips().first().single()
+            assertEquals(5, card.visitSummary.visitCount)
+            assertEquals(listOf("Las Vegas 인근", "Grand Canyon 인근", "Niagara Falls 인근"), card.visitSummary.representativeNames)
+            assertEquals(1, card.visitSummary.otherNamedPlaceCount)
+            assertEquals(1, card.visitSummary.unresolvedVisitCount)
+            assertEquals(card.visitSummary, repository.getTripById("offline")!!.visitSummary)
+            assertEquals(4, db.visitDao().getVisitsForTrip("offline").count { it.placeName == null })
+            compose.activityRule.scenario.onActivity { activity -> activity.setContent {
+                MaterialTheme { Box(Modifier.fillMaxSize().safeDrawingPadding().padding(16.dp)) {
+                    TripCard(card, {}, {})
+                } }
+            } }
+            compose.onNodeWithText("주요 방문 지역: Las Vegas 인근 · Grand Canyon 인근 · Niagara Falls 인근 외 1곳").assertIsDisplayed()
+            compose.onNodeWithText("지역을 확인하지 못한 방문 1회").assertIsDisplayed()
+            compose.onNodeWithText("장소 이름 정보 부족").assertDoesNotExist()
+            compose.waitForIdle()
+            assertTrue(UiDevice.getInstance(InstrumentationRegistry.getInstrumentation()).takeScreenshot(
+                File(context.getExternalFilesDir(null), "rc9-offline-regions.png")))
+        } finally { db.close() }
+    }
+
+    @Test fun photoCountsRankStopsAndPhotoReassignmentRefreshesSummary() = runBlocking {
+        val db = Room.inMemoryDatabaseBuilder(context, TravelerDatabase::class.java).build()
+        try {
+            val repository = TripRepositoryImpl(db)
+            val a = visit("a", "First stop")
+            val b = visit("b", "Photo stop")
+            val photo = MediaItem("photo", "content://fixture/photo", "photo.jpg", "image/jpeg", start,
+                TimestampConfidence.EXIF_EXACT, "UTC", b.location, LocationConfidenceLevel.GPS_EXACT,
+                1f, matchedVisitId = b.id, assignedDayIso = "2026-07-01")
+            repository.saveTrip(trip("photos").copy(days = listOf(TripDay(1, "2026-07-01", items = listOf(
+                TripDayItem.VisitItem(a), TripDayItem.VisitItem(b, listOf(photo))
+            )))))
+            val updates = Channel<List<Trip>>(Channel.UNLIMITED)
+            val observer = launch { repository.getAllTrips().collect { updates.send(it) } }
+            try {
+                val initial = withTimeout(10_000) { updates.receive() }.single().visitSummary
+                assertEquals("Photo stop", initial.representativeNames.first())
+                assertEquals(initial, repository.getTripById("photos")!!.visitSummary)
+                repository.updateMediaVisit("photos", "photo", "a")
+                val changed = withTimeout(10_000) {
+                    var summary: TripVisitSummary
+                    do { summary = updates.receive().single().visitSummary }
+                    while (summary.representativeNames.first() != "First stop")
+                    summary
+                }
+                assertEquals(2, changed.visitCount)
+                assertEquals(changed, repository.getTripById("photos")!!.visitSummary)
+            } finally { observer.cancelAndJoin(); updates.close() }
+        } finally { db.close() }
     }
 }

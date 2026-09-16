@@ -7,5 +7,12 @@ import com.traveler.core.database.entity.TripEntity
 data class TripCardRow(
     @Embedded val trip: TripEntity,
     val summaryVisitId: String?,
-    val summaryPlaceName: String?
+    val summaryPlaceName: String?,
+    val summaryLatitude: Double?,
+    val summaryLongitude: Double?,
+    val summaryStart: Long?,
+    val summaryEnd: Long?,
+    val summaryTimezone: String?,
+    val summaryUserOverride: Boolean,
+    val summaryPhotoCount: Int
 )

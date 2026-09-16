@@ -2,7 +2,7 @@
 
 An independent Android 3D edition of [My Travel Diary](https://github.com/HyeokjaeKwon26/My-Travel-Diary), based on original commit `9bcfb4f`.
 
-**Version: 1.0.0-rc8.** Accurate recorded-visit summaries, compact playback overlays, non-blocking background map preparation, bounded 2D drawing, automatic north-up route framing, adaptive phone/tablet layouts, calendar dates, local visual photo selection, and portrait/landscape video creation and playback. Physical-device acceptance is pending; Galaxy S23 Ultra is the primary target. See [validation and remaining work](docs/PRODUCTION_STATUS.md).
+**Version: 1.0.0-rc9.** Accurate recorded-visit summaries, compact playback overlays, non-blocking background map preparation, bounded 2D drawing, automatic north-up route framing, adaptive phone/tablet layouts, calendar dates, local visual photo selection, and portrait/landscape video creation and playback. Physical-device acceptance is pending; Galaxy S23 Ultra is the primary target. See [validation and remaining work](docs/PRODUCTION_STATUS.md).
 
 ## 한국어
 
@@ -15,8 +15,13 @@ Google Timeline JSON과 휴대폰 사진을 여행 다이어리로 구성하고,
 
 ### 이번 버전
 
+- 이름 없는 방문은 기존 오프라인 도시·관광지 목록과 좌표를 비교해 `Boston 인근`처럼 보완합니다. 가까운 지역을 뜻하며 해당 관광지 방문을 확정하지 않습니다. 추가 다운로드나 위치의 서버 전송 없이 기존 여행에도 적용됩니다.
+- 대표 지역은 중복을 묶고 직접 수정한 이름·기록된 이름을 우선한 뒤, 체류시간·사진 수·방문 날짜 분포로 고릅니다. 지명 목록에서 멀리 떨어진 방문은 미확인으로 남깁니다.
+
+### 최근 카드 개선
+
 - 여행 카드의 `places`를 `방문 기록 N회`로 바꿨습니다. 이름 없는 방문과 재방문을 포함하고, 여러 날짜에 걸친 같은 방문은 한 번만 셉니다. 기존 여행도 다시 가져올 필요 없이 적용됩니다.
-- `대표 장소`는 저장되거나 직접 수정한 이름을 최대 3개와 나머지 개수로 표시합니다. 이름 없는 방문만 있거나 Home/Work만 알려진 불완전한 기록은 `장소 이름 정보 부족`으로 표시합니다. 기록에 없는 장소를 추정하거나 도시 수로 해석하지 않습니다.
+- `대표 장소`는 저장되거나 직접 수정한 이름을 최대 3개와 나머지 개수로 표시합니다. 좌표에서도 주변 지역을 찾지 못하면 미확인 방문 수를 표시하고, 표시할 이름이 전혀 없을 때 `장소 이름 정보 부족`으로 표시합니다. 주변 지역 표시는 정확한 관광지 방문을 확정하지 않으며, 방문 기록 수는 도시 수와 구분합니다.
 - 카드의 거리·사진·방문 배지는 좁은 화면이나 큰 글꼴에서 자동 줄바꿈합니다.
 
 ### 유지되는 기능

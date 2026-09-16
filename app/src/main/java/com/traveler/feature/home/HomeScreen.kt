@@ -198,7 +198,7 @@ internal fun TripCard(
                 Spacer(modifier = Modifier.height(8.dp))
                 Text(
                     text = if (summary.representativeNames.isEmpty()) "장소 이름 정보 부족" else buildString {
-                        append("대표 장소: ")
+                        append(if (summary.hasApproximateRegions) "주요 방문 지역: " else "대표 장소: ")
                         append(summary.representativeNames.joinToString(" · "))
                         if (summary.otherNamedPlaceCount > 0) append(" 외 ${summary.otherNamedPlaceCount}곳")
                     },
@@ -207,8 +207,8 @@ internal fun TripCard(
                     fontSize = 12.sp,
                     color = MaterialTheme.colorScheme.primary
                 )
-                if (summary.unnamedVisitCount > 0 && summary.representativeNames.isNotEmpty()) {
-                    Text("이름 없는 방문 기록 ${summary.unnamedVisitCount}회",
+                if (summary.unresolvedVisitCount > 0 && summary.representativeNames.isNotEmpty()) {
+                    Text("지역을 확인하지 못한 방문 ${summary.unresolvedVisitCount}회",
                         fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }

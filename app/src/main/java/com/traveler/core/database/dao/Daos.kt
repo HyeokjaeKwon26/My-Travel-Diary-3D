@@ -8,10 +8,19 @@ import kotlinx.coroutines.flow.Flow
 interface TripDao {
     @Query("""
         SELECT t.*, v.sourceId AS summaryVisitId,
-               COALESCE(o.overrideValue, v.placeName) AS summaryPlaceName
+               COALESCE(o.overrideValue, v.placeName) AS summaryPlaceName,
+               v.latitude AS summaryLatitude, v.longitude AS summaryLongitude,
+               v.startTimestampEpochMs AS summaryStart, v.endTimestampEpochMs AS summaryEnd,
+               v.timezoneId AS summaryTimezone,
+               (o.id IS NOT NULL OR COALESCE(v.isUserOverride, 0)) AS summaryUserOverride,
+               COALESCE(p.photoCount, 0) AS summaryPhotoCount
         FROM trips t
         LEFT JOIN visits v ON v.tripId = t.id
         LEFT JOIN user_overrides o ON o.targetType = 'VISIT_NAME' AND o.targetSourceId = v.sourceId
+        LEFT JOIN (
+            SELECT tripId, matchedVisitId, COUNT(*) AS photoCount FROM trip_media
+            WHERE matchedVisitId IS NOT NULL GROUP BY tripId, matchedVisitId
+        ) p ON p.tripId = v.tripId AND p.matchedVisitId = v.sourceId
         ORDER BY t.createdAtEpochMs DESC, t.id, v.startTimestampEpochMs, v.sourceId
     """)
     fun getTripCardRowsFlow(): Flow<List<TripCardRow>>
