@@ -23,6 +23,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
 /** Compact live-player chrome. Every button retains a 48dp touch target. */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun PlaybackControls(
     progress: Float, timeLabel: String, isPlaying: Boolean, speed: Float,
