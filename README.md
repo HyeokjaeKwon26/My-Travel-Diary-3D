@@ -2,7 +2,7 @@
 
 An independent Android 3D edition of [My Travel Diary](https://github.com/HyeokjaeKwon26/My-Travel-Diary), based on original commit `9bcfb4f`.
 
-**Version: 1.0.0-rc2.** Offline cartography draped over 3D terrain, automatic elevation preparation, and signed installation builds. Physical-device acceptance is pending; Galaxy S23 Ultra is the primary target. See [validation and remaining work](docs/PRODUCTION_STATUS.md).
+**Version: 1.0.0-rc3.** Larger animated toy vehicles, corrected globe-following flights, offline cartography over 3D terrain, and signed installation builds. Physical-device acceptance is pending; Galaxy S23 Ultra is the primary target. See [validation and remaining work](docs/PRODUCTION_STATUS.md).
 
 ## 한국어
 
@@ -15,9 +15,14 @@ Google Timeline JSON과 휴대폰 사진을 여행 다이어리로 구성하고,
 
 ### 이번 버전
 
+- 자동차·버스·기차·지하철·비행기·배·자전거·걷기·달리기를 크게 과장한 입체 장난감으로 표시합니다.
+- 오르막/내리막의 기울기, 통통 튀는 차체, 회전하는 바퀴, 걷기/달리기/페달 동작과 비행기·배의 흔들림을 추가했습니다.
+- 긴 비행이 지구 안으로 들어가던 계산을 수정하고, 북쪽 고정 카메라에서도 기체는 경로 진행 방향을 향합니다.
+- 과장된 움직임은 화면과 저장 영상의 연출에만 적용되며 원래 위치·고도 기록은 변경하지 않습니다.
+
 - 갈색 지형이 지도를 가리던 문제 수정: 지형 위에 해안선·강·주요 도로·도시 영역·지명을 표시. 지도 좌우 반전도 수정.
 - 기본 지도는 APK에 포함되어 고도 다운로드 전이나 오프라인에서도 표시됩니다. 모든 골목길을 포함한 내비게이션 지도는 아닙니다.
-- OpenGL ES 2.0 지구본, 지역 지형, 간단한 자동차/비행기와 추적 카메라.
+- OpenGL ES 2.0 지구본, 지역 지형, 이동수단별 입체 모델과 추적 카메라.
 - 실제 공개 고도 데이터로 만든 **Grand Canyon South Rim** 오프라인 지형 팩.
 - 지상 이동 경로 주변 지형 자동 다운로드, 일시정지·재개, 모바일 데이터 선택.
 - 기본 200 MB 캐시(100/200/500 MB 선택), 여행별 오프라인 유지와 임시 지형 정리.
@@ -55,10 +60,12 @@ Google Timeline JSON과 휴대폰 사진을 여행 다이어리로 구성하고,
 
 ## Preview
 
-Actual GLES frames: offline reference map over synthetic flat elevation, and an illustrative route over real Grand Canyon elevation.
+Actual GLES frames: large toy vehicles following a flight and synthetic uphill/downhill routes, plus mapped terrain in the signed app.
 
-<img src="docs/verification-3d/rc2-san-francisco.png" width="480" alt="Offline roads, land, water and labels on the 3D surface" />
-<img src="docs/verification-3d/rc2-canyon-video.png" width="320" alt="Video frame showing river and road cartography over Grand Canyon relief" />
+<img src="docs/verification-3d/rc3-airplane.png" width="480" alt="Solid aircraft facing its westbound continental route" />
+<img src="docs/verification-3d/rc3-car-climb.png" width="320" alt="Toy car pitching up on a climb" />
+<img src="docs/verification-3d/rc3-car-descent.png" width="320" alt="Toy car pitching down on a descent" />
+<img src="docs/verification-3d/rc3-signed-car.png" width="320" alt="Signed RC3 app showing a large car over mapped Grand Canyon terrain" />
 
 ## Build and validation
 
