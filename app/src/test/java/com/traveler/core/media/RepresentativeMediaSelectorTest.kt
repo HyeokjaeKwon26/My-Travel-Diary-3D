@@ -60,6 +60,7 @@ class RepresentativeMediaSelectorTest {
                 timestampEpochMs = baseMs + i * 5000L, // 5s apart (within 60s)
                 location = GeoPoint(loc.latitude + i * 0.00001, loc.longitude), // ~1m apart
                 locationConfidence = if (i == 3) LocationConfidenceLevel.GPS_EXACT else LocationConfidenceLevel.UNKNOWN,
+                visualFeatures = PhotoVisualFeatures(42L, 500f, .8f, listOf(.2f,.8f)),
                 matchedVisitId = "visit_boston"
             )
         }

@@ -65,9 +65,16 @@ class GapBridgingAndAltitudeTest {
     fun missingRecordingDoesNotInventDrivingOrFlight() {
         val timeline = TravelStoryTimeline.build(createTripWithGaps(), StoryDurationProfile.STANDARD)
         val movements = timeline.episodes.filterIsInstance<StoryEpisode.MovementEpisode>()
-        assertEquals(listOf("s_dc"), movements.map { it.segment.id })
+        assertEquals(listOf("s_dc"), movements.filterNot { it.segment.id.startsWith("bridge_") }.map { it.segment.id })
         assertEquals(3, timeline.episodes.filterIsInstance<StoryEpisode.VisitEpisode>().size)
-        assertFalse(movements.any { it.segment.id.startsWith("bridge_") })
+        val bridges = movements.filter { it.segment.id.startsWith("bridge_") }
+        assertEquals(2, bridges.size)
+        assertTrue(bridges.all { it.segment.geometryProvenance == GeometryProvenance.CONTINUITY_ESTIMATE && it.segment.effectiveMode == TransportMode.UNKNOWN })
+        assertEquals(200_000.0, timeline.totalTripDistanceMeters, 0.1)
+        for (i in 0..1000) {
+            val state=timeline.evaluate(i/1000f)
+            assertTrue(state.currentTraveledDistanceMeters <= timeline.totalTripDistanceMeters)
+        }
         val diagnostic = PlaybackContinuityDiagnostic()
         for (step in 0..500) diagnostic.recordFrame(timeline.evaluate(step / 500f), false)
         assertEquals(0, diagnostic.playbackProgressBackwardCount)

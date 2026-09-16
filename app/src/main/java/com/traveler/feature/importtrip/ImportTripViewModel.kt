@@ -23,7 +23,7 @@ import java.time.LocalDate
 
 sealed interface ImportUiState {
     object Idle : ImportUiState
-    data class Loading(val status: String) : ImportUiState
+    data class Loading(val status: String, val progress: com.traveler.domain.usecase.ImportProgress? = null, val startedMs: Long = android.os.SystemClock.elapsedRealtime()) : ImportUiState
     data class Success(val tripId: String) : ImportUiState
     data class Error(val message: String) : ImportUiState
 }
@@ -36,11 +36,22 @@ class ImportTripViewModel(application: Application) : AndroidViewModel(applicati
         locationHistorySource = GoogleTimelineJsonParser(),
         mediaRepository = AndroidMediaStoreScanner(application),
         transportClassifier = RuleBasedTransportClassifier(),
-        tripRepository = tripRepository
+        tripRepository = tripRepository,
+        analyzePhotos = com.traveler.core.media.PhotoVisualAnalyzer(application)::analyze
     )
 
     private val _uiState = MutableStateFlow<ImportUiState>(ImportUiState.Idle)
     val uiState: StateFlow<ImportUiState> = _uiState.asStateFlow()
+
+    private var importJob: kotlinx.coroutines.Job? = null
+    private var startedMs = 0L
+    private fun updateProgress(progress: com.traveler.domain.usecase.ImportProgress) {
+        if (importJob?.isActive == true) _uiState.value = ImportUiState.Loading(progress.stage, progress, startedMs)
+    }
+    fun cancelImport() {
+        importJob?.cancel()
+        _uiState.value = ImportUiState.Idle
+    }
 
     fun createTripFromUri(
         uri: Uri,
@@ -48,7 +59,9 @@ class ImportTripViewModel(application: Application) : AndroidViewModel(applicati
         endDate: LocalDate,
         customTitle: String?
     ) {
-        viewModelScope.launch {
+        if (importJob?.isCompleted == false) return
+        startedMs = android.os.SystemClock.elapsedRealtime()
+        importJob = viewModelScope.launch {
             _uiState.value = ImportUiState.Loading("Reading and parsing Timeline JSON...")
             try {
                 val context = getApplication<Application>()
@@ -61,21 +74,22 @@ class ImportTripViewModel(application: Application) : AndroidViewModel(applicati
                         startDate = startDate,
                         endDate = endDate,
                         customTitle = customTitle,
-                        onProgress = { status ->
-                            _uiState.value = ImportUiState.Loading(status)
-                        }
+                        onWorkProgress = ::updateProgress
                     )
                 }
 
                 _uiState.value = ImportUiState.Success(trip.id)
-            } catch (e: Exception) {
+            } catch (e: kotlinx.coroutines.CancellationException) { throw e }
+            catch (e: Exception) {
                 _uiState.value = ImportUiState.Error(e.message ?: "Failed to generate travel story")
             }
         }
     }
 
     fun createSampleDemoTrip() {
-        viewModelScope.launch {
+        if (importJob?.isCompleted == false) return
+        startedMs = android.os.SystemClock.elapsedRealtime()
+        importJob = viewModelScope.launch {
             _uiState.value = ImportUiState.Loading("Generating Sample Boston & Niagara Trip...")
             try {
                 val demoJson = getSampleTimelineJson()
@@ -100,19 +114,20 @@ class ImportTripViewModel(application: Application) : AndroidViewModel(applicati
                     startDate = LocalDate.of(2026, 7, 1),
                     endDate = LocalDate.of(2026, 7, 2),
                     customTitle = "🇨🇦 Boston to Niagara Road & Flight",
-                    onProgress = { status ->
-                        _uiState.value = ImportUiState.Loading(status)
-                    }
+                    onWorkProgress = ::updateProgress
                 )
                 _uiState.value = ImportUiState.Success(trip.id)
-            } catch (e: Exception) {
+            } catch (e: kotlinx.coroutines.CancellationException) { throw e }
+            catch (e: Exception) {
                 _uiState.value = ImportUiState.Error(e.message ?: "Failed to generate demo trip")
             }
         }
     }
 
     fun createCanyonDemoTrip() {
-        viewModelScope.launch {
+        if (importJob?.isCompleted == false) return
+        startedMs = android.os.SystemClock.elapsedRealtime()
+        importJob = viewModelScope.launch {
             _uiState.value = ImportUiState.Loading("Preparing offline Grand Canyon demo…")
             try {
                 val trip = com.traveler.feature.map.threed.CanyonDemo.trip()

@@ -80,7 +80,9 @@ fun TravelMapView(
     }
 
     val storyTimeline = remember(renderModel) {
-        com.traveler.feature.map.story.TravelStoryTimeline.build(renderModel, com.traveler.core.media.StoryDurationProfile.STANDARD)
+        com.traveler.feature.map.story.TravelStoryTimeline.build(renderModel, com.traveler.core.media.StoryDurationProfile.STANDARD,
+            titleCard=com.traveler.feature.map.story.StoryTitleCard("", ""),
+            endCard=com.traveler.feature.map.story.StoryEndCard("", "", "", ""))
     }
 
     val timeTracker = remember(storyTimeline, initialPlaybackProgress) {
@@ -101,6 +103,7 @@ fun TravelMapView(
         }
     }
 
+    var mapBuffering by remember { mutableStateOf(false) }
     var isPlaying by remember(initialIsPlaying) { mutableStateOf(initialIsPlaying) }
     var playbackProgress by remember(initialPlaybackProgress) { mutableStateOf(initialPlaybackProgress) }
     var playbackSpeed by remember { mutableStateOf(1.0f) }
@@ -157,8 +160,8 @@ fun TravelMapView(
     }
 
     // Playback loop driven by monotonic clock and withFrameNanos (P1-05)
-    LaunchedEffect(isPlaying, initialPlaybackProgress, timeTracker) {
-        if (isPlaying) {
+    LaunchedEffect(isPlaying, mapBuffering, initialPlaybackProgress, timeTracker) {
+        if (isPlaying && !mapBuffering) {
             if (isMusicEnabled) {
                 soundtrackPlayer.start()
             }
@@ -191,7 +194,7 @@ fun TravelMapView(
         // clipping layer covers its separate GPU surface on some Android versions.
         modifier = modifier
     ) {
-        com.traveler.feature.map.threed.Map3DLayer(renderModel, storyTimeline, currentActiveState, isPlaying) {
+        com.traveler.feature.map.threed.Map3DLayer(renderModel, storyTimeline, currentActiveState, isPlaying, onBuffering = { mapBuffering = it }) {
     LaunchedEffect(Unit) {
         if (!RegionalBasemapCache.isReady) {
             val prep = RegionalBasemapCache.ensureLoaded(context.applicationContext)
@@ -237,6 +240,7 @@ fun TravelMapView(
         Column(
             modifier = Modifier
                 .align(Alignment.TopStart)
+                .fillMaxWidth(.62f)
                 .padding(10.dp),
             verticalArrangement = Arrangement.spacedBy(6.dp)
         ) {
@@ -284,7 +288,7 @@ fun TravelMapView(
                 ) {
                     Column(
                         verticalArrangement = Arrangement.spacedBy(5.dp),
-                        modifier = Modifier.width(148.dp)
+                        modifier = Modifier.widthIn(max = 200.dp)
                     ) {
                         // Top row: Transport Mode or Place (Speed removed per user request)
                         Row(
@@ -293,7 +297,11 @@ fun TravelMapView(
                             modifier = Modifier.fillMaxWidth()
                         ) {
                             Text(text = mode.emoji, fontSize = 13.sp)
-                            val modeLabel = if (currentActiveState.currentVisit != null) {
+                            val modeLabel = if (currentActiveState.isTitleCardActive || currentActiveState.isEndCardActive) {
+                                "Journey overview"
+                            } else if (currentActiveState.currentSegment?.id?.startsWith("bridge_")==true) {
+                                "Estimated connection"
+                            } else if (currentActiveState.currentVisit != null) {
                                 currentActiveState.currentVisit.placeName ?: "Stop"
                             } else {
                                 mode.name.lowercase().replaceFirstChar { it.uppercase() }
@@ -310,9 +318,8 @@ fun TravelMapView(
                         }
 
                         // Middle row: Current Traveled Distance / Total Trip Distance
-                        Row(
-                            verticalAlignment = Alignment.Bottom,
-                            horizontalArrangement = Arrangement.SpaceBetween,
+                        Column(
+                            verticalArrangement = Arrangement.spacedBy(2.dp),
                             modifier = Modifier.fillMaxWidth()
                         ) {
                             Text(
@@ -559,7 +566,7 @@ fun TravelMapView(
                             .clickable {
                                 isMusicEnabled = !isMusicEnabled
                                 soundtrackPlayer.isEnabled = isMusicEnabled
-                                if (isMusicEnabled && isPlaying) {
+                                if (isMusicEnabled && isPlaying && !mapBuffering) {
                                     soundtrackPlayer.resume()
                                 } else {
                                     soundtrackPlayer.pause()

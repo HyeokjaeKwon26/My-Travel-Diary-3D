@@ -2,7 +2,7 @@
 
 An independent Android 3D edition of [My Travel Diary](https://github.com/HyeokjaeKwon26/My-Travel-Diary), based on original commit `9bcfb4f`.
 
-**Version: 1.0.0-rc4.** North-up location following, visible-area street maps over 3D terrain, large animated toy vehicles, and signed installation builds. Physical-device acceptance is pending; Galaxy S23 Ultra is the primary target. See [validation and remaining work](docs/PRODUCTION_STATUS.md).
+**Version: 1.0.0-rc5.** Automatic north-up route framing, adaptive phone/tablet layouts, calendar dates, local visual photo selection, and portrait/landscape video creation and playback. Physical-device acceptance is pending; Galaxy S23 Ultra is the primary target. See [validation and remaining work](docs/PRODUCTION_STATUS.md).
 
 ## 한국어
 
@@ -15,9 +15,14 @@ Google Timeline JSON과 휴대폰 사진을 여행 다이어리로 구성하고,
 
 ### 이번 버전
 
-- 지도를 항상 북쪽 위로 고정하고 현재 이동 위치만 따라갑니다. 지상 구간의 자동 도착 줌을 없애고 Close / Local / Area / Region 배율을 추가했습니다.
+- 북쪽을 위로 고정하고 경로 길이·화면 비율에 맞춰 자동 배율을 계산합니다. 수동 배율·핀치 줌은 사용하지 않습니다. 캐릭터를 줄이고 경로 선의 화면상 굵기를 유지합니다.
+- 긴 구간은 더 천천히, 더 넓게 보여주며 시작·끝에는 전체 경로를 보여줍니다. 화면과 영상이 같은 카메라 계산을 사용합니다.
+- 좁은 화면은 지도 위/일지 아래, 넓은 화면은 지도·일지를 나란히 표시합니다. 회전과 창 크기 변경에도 재생 화면을 유지합니다.
+- 날짜는 달력에서 범위로 선택합니다. 여행 생성은 처리 단계·건수·가중 진행률·예상 남은 시간을 표시하며 취소할 수 있습니다.
+- 사진 썸네일의 유사도·선명도·노출·장면 종류를 휴대폰에서 분석하고 결과를 캐시합니다. 사진의 개인적 중요도를 보장하지는 않으며 직접 고른 사진을 우선합니다.
+- 세로 9:16/가로 16:9, 1080p/720p 영상을 생성하고 앱 내 플레이어에서 회전·전체화면으로 볼 수 있습니다. 원래 영상 비율을 유지합니다.
 - 현재 화면의 OpenStreetMap 도로·지명을 3D 지형에 표시합니다. 처음 보는 지역은 인터넷이 필요하며 Wi-Fi/모바일 데이터 사용을 지도 옵션에서 끌 수 있습니다.
-- 상세 지도 캐시는 최대 96 MiB입니다. 지형 캐시와 별도이며, 경로 전체를 미리 다운로드하거나 오프라인 지도 팩을 만들지 않습니다. 영상은 이미 불러온 지도만 재사용하며 없는 부분은 기본 지도로 표시합니다.
+- 지도 준비 중에는 사진·이동·음악을 함께 대기시킵니다. 실패 시 무한 대기하지 않고 기본 지도와 함께 재개합니다. 상세 지도 캐시는 최대 96 MiB입니다. 지형 캐시와 별도이며, 경로 전체를 미리 다운로드하거나 오프라인 지도 팩을 만들지 않습니다. 영상 생성 전에 이미 불러온 지도를 별도로 고정해 사용하며 없는 부분은 기본 지도로 표시합니다. 임시 복사본은 최대 96 MiB이며 완료·취소 후 삭제합니다.
 
 - 자동차·버스·기차·지하철·비행기·배·자전거·걷기·달리기를 크게 과장한 입체 장난감으로 표시합니다.
 - 오르막/내리막의 기울기, 통통 튀는 차체, 회전하는 바퀴, 걷기/달리기/페달 동작과 비행기·배의 흔들림을 추가했습니다.
@@ -33,7 +38,7 @@ Google Timeline JSON과 휴대폰 사진을 여행 다이어리로 구성하고,
 - 화면 주변 최대 12개 지형 메쉬, 부하·발열에 따른 내부 해상도 조절, 고정 북쪽 카메라와 2D 전환.
 - 1080p/720p 선택, 2.9 MB 압축 음악의 스트리밍 디코딩.
 - 여행 JSON 백업·복원(원본 사진 파일 및 지형 캐시는 미포함).
-- 지도와 재생에서 경로 준비를 공유하고, 표시 전용 직선 연결·근거 없는 이동 구간 자동 생성을 제거.
+- 기록이 없는 시간 간격은 표시 전용 점선으로 연결합니다. 이동수단은 미상으로 두며 원본 기록·총 이동거리에 합산하지 않습니다. 고도 누락은 높이를 보간하며 수평 경로를 숨기지 않습니다.
 - 재생 중 미래 경로를 숨기고 과거 경로를 흐리게 표시하여 왕복 경로 혼동을 줄임.
 - 원래 고도와 시간별 좌표 보존, 단일 고도 이상치 필터, 급격한 고도 불연속 표시.
 - 같은 3D 렌더러를 사용하는 H.264 MP4 출력과 선택적 AAC 음악.
@@ -64,16 +69,14 @@ Google Timeline JSON과 휴대폰 사진을 여행 다이어리로 구성하고,
 
 ## Preview
 
-RC4 signed app with north-up street detail (Canyon example route is illustrative, not road matched):
+RC5 north-up playback and a landscape video frame. The Canyon example is illustrative, not road matched; cached street detail and public elevation data provide context.
 
-<img src="docs/verification-3d/rc4-signed-street.png" width="320" alt="North-up street map with South Entrance Road and a large animated car" />
+<img src="docs/verification-3d/rc5-signed-play.png" width="320" alt="RC5 north-up map, smaller car and adaptive travel diary" />
+<img src="docs/verification-3d/rc5-landscape-video.png" width="640" alt="Landscape video showing Canyon terrain, the route, a toy car and AZ 64 road context" />
 
-Earlier GLES frames: large toy vehicles following a flight and synthetic uphill/downhill routes, plus mapped terrain in the signed app.
+Continental flights use the globe view without overlapping regional-map meshes.
 
-<img src="docs/verification-3d/rc3-airplane.png" width="480" alt="Solid aircraft facing its westbound continental route" />
-<img src="docs/verification-3d/rc3-car-climb.png" width="320" alt="Toy car pitching up on a climb" />
-<img src="docs/verification-3d/rc3-car-descent.png" width="320" alt="Toy car pitching down on a descent" />
-<img src="docs/verification-3d/rc3-signed-car.png" width="320" alt="Signed RC3 app showing a large car over mapped Grand Canyon terrain" />
+<img src="docs/verification-3d/rc5-airplane.png" width="480" alt="Aircraft over a clean north-up globe" />
 
 ## Build and validation
 
@@ -82,7 +85,7 @@ Requires JDK 17 and Android SDK platform 36. Open in Android Studio or run:
 ```sh
 ./gradlew testDebugUnitTest assembleDebug lintDebug
 # With an Android emulator/device connected:
-./gradlew connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=com.traveler.feature.map.ThreeDIntegrationTest,com.traveler.core.database.RoomMigrationAndroidTest,com.traveler.feature.video.TravelVideoExportAndroidTest
+./gradlew connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=com.traveler.feature.ui.AdaptiveJourneyAndroidTest,com.traveler.feature.map.ThreeDIntegrationTest,com.traveler.feature.map.StreetMapAndroidTest,com.traveler.feature.map.MapDrapeAndroidTest,com.traveler.feature.map.ToyVehicleAndroidTest,com.traveler.feature.video.TravelVideoExportAndroidTest
 ```
 
 On Windows use `gradlew.bat`. Debug APK: `app/build/outputs/apk/debug/app-debug.apk`. Signed release setup: [installation and signing](docs/INSTALLATION_3D.md).

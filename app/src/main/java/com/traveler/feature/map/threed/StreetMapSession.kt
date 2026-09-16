@@ -30,6 +30,9 @@ class StreetMapSession(context:Context,private val network:Boolean=false,
     @Volatile private var wanted:StreetTilePlan?=null
     @Volatile private var active=network
     @Volatile private var closed=false
+    @Volatile private var requestedTile:StreetTile?=null
+    private val bufferGate=MapBufferGate()
+    @Volatile var buffering=false;private set
     @Volatile private var connection:HttpURLConnection?=null
     @Volatile var status="Reference map · loading street detail";private set
     @Volatile var detailCount=0;private set
@@ -44,8 +47,13 @@ class StreetMapSession(context:Context,private val network:Boolean=false,
                     if(closed || tile !in (wanted?.tiles ?: emptyList())) break
                     if((checked[tile] ?: 0)>System.currentTimeMillis() &&
                         (synchronized(lock) { tile in bitmaps } || !File(directory,"${tile.key}.png").isFile)) continue
+                    // Parent detail is reused only when already cached; never download a zoom stack.
+                    for (depth in 3 downTo 1) if(tile.z >= depth) {
+                        val parent=StreetTile(tile.z-depth,tile.x shr depth,tile.y shr depth)
+                        if(File(directory,"${parent.key}.png").isFile && synchronized(lock) { parent !in bitmaps }) load(parent,false)
+                    }
                     load(tile,active)
-                    delay(120)
+                    delay(40)
                 }
                 updateStatus()
             }
@@ -56,7 +64,12 @@ class StreetMapSession(context:Context,private val network:Boolean=false,
     fun setActive(value:Boolean) { active=network && value;if(!active) connection?.disconnect() }
     fun request(plan:StreetTilePlan) {
         wanted=plan
+        requestedTile?.let { if(it !in plan.tiles) connection?.disconnect() }
         if(!network) for(tile in plan.tiles) {
+            for(depth in 3 downTo 1) if(tile.z>=depth) {
+                val parent=StreetTile(tile.z-depth,tile.x shr depth,tile.y shr depth)
+                if(snapshot?.contains(parent.key)==true && synchronized(lock) { parent !in bitmaps }) load(parent,false)
+            }
             if(snapshot?.contains(tile.key)==true && synchronized(lock) { tile !in bitmaps }) load(tile,false)
         }
         updateStatus()
@@ -66,7 +79,12 @@ class StreetMapSession(context:Context,private val network:Boolean=false,
         val keys=wanted?.tiles.orEmpty()
         val count=synchronized(lock) { keys.count { it in bitmaps } }
         detailCount=count
+        val waiting=bufferGate.update(android.os.SystemClock.elapsedRealtime(), network && active && System.currentTimeMillis()>=blockedUntil,
+            keys.isNotEmpty() && count < keys.size)
+        if(buffering!=waiting) { buffering=waiting;changed() }
         val text=when {
+            keys.isEmpty() -> "Globe overview · north up"
+            waiting -> "Preparing map $count/${keys.size} · playback waits"
             count==keys.size && count>0 -> "Street map · north up"
             count>0 -> "Street detail $count/${keys.size} · north up"
             !network -> "Reference map · street detail not cached"
@@ -91,6 +109,7 @@ class StreetMapSession(context:Context,private val network:Boolean=false,
         try {
             val request=connectionFactory(tile)
             connection=request
+            requestedTile=tile
             if(!active || closed) return
             request.connectTimeout=5000;request.readTimeout=5000
             request.setRequestProperty("User-Agent","MyTravelDiary3D/${BuildConfig.VERSION_NAME} (+https://github.com/HyeokjaeKwon26/My-Travel-Diary-3D)")
@@ -145,7 +164,7 @@ class StreetMapSession(context:Context,private val network:Boolean=false,
             checked[tile]=max(expires,now+60_000)
             trimDisk()
         } catch(_:Exception) { /* Cached map and bundled geography remain visible. */ }
-        finally { connection?.disconnect();connection=null;updateStatus() }
+        finally { connection?.disconnect();connection=null;requestedTile=null;updateStatus() }
     }
     companion object { @Volatile private var blockedUntil=0L }
     private fun decode(file:File):Bitmap? = runCatching {
@@ -158,7 +177,7 @@ class StreetMapSession(context:Context,private val network:Boolean=false,
         synchronized(lock) {
             if(closed) { bitmap.recycle();return }
             bitmaps.put(tile,bitmap)?.recycle()
-            while(bitmaps.size>48) { val key=bitmaps.keys.first();bitmaps.remove(key)?.recycle() }
+            while(bitmaps.size>96) { val key=bitmaps.keys.first();bitmaps.remove(key)?.recycle() }
         }
         revision.incrementAndGet();changed()
     }
@@ -175,14 +194,25 @@ class StreetMapSession(context:Context,private val network:Boolean=false,
         synchronized(lock) {
             val paint=Paint(Paint.FILTER_BITMAP_FLAG)
             for(tile in plan.tiles) {
-                val bitmap=bitmaps[tile] ?: continue
+                var source=tile
+                var bitmap=bitmaps[source]
+                while(bitmap==null && source.z>0) {
+                    source=StreetTile(source.z-1,source.x/2,source.y/2)
+                    bitmap=bitmaps[source]
+                }
+                if(bitmap==null) continue
                 val n=(1 shl tile.z).toDouble()
                 var x=tile.x/n
                 x+=round(w.x+w.span/2-(x+.5/n))
                 val left=((x-w.x)/w.span*size).toFloat()
                 val top=((tile.y/n-w.y)/w.span*size).toFloat()
                 val side=(size/(n*w.span)).toFloat()
-                canvas.drawBitmap(bitmap,null,RectF(left,top,left+side,top+side),paint)
+                val factor=1 shl (tile.z-source.z)
+                val step=256f/factor
+                val sx=(tile.x-source.x*factor)*step
+                val sy=(tile.y-source.y*factor)*step
+                val src=Rect(sx.toInt(),sy.toInt(),ceil(sx+step).toInt(),ceil(sy+step).toInt())
+                canvas.drawBitmap(bitmap,src,RectF(left,top,left+side,top+side),paint)
             }
         }
     }

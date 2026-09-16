@@ -27,7 +27,7 @@ object RepresentativeMediaSelector {
         var score = 0
 
         // 1. User manual override / chosen
-        if (photo.isRepresentative) score += 1000
+        if (photo.isRepresentative) score += 100000
 
         // 2. Exact GPS location
         if (photo.locationConfidence == LocationConfidenceLevel.GPS_EXACT) {
@@ -61,7 +61,14 @@ object RepresentativeMediaSelector {
             score -= 200
         }
 
-        return score
+        return (if(photo.isRepresentative) 100000 else 0) +
+            (score - if(photo.isRepresentative) 100000 else 0)/8 + (photo.visualFeatures?.qualityScore ?: 180)
+    }
+
+    fun visuallyDuplicate(a: MediaItem, b: MediaItem): Boolean {
+        val x=a.visualFeatures;val y=b.visualFeatures
+        // Unknown image content is never evidence of a duplicate.
+        return x != null && y != null && x.similar(y)
     }
 
     /**
@@ -91,8 +98,9 @@ object RepresentativeMediaSelector {
 
                 val sameVisit = photo.matchedVisitId != null && photo.matchedVisitId == anchor.matchedVisitId
 
-                if ((timeDiff <= BURST_TIME_WINDOW_MS && dist <= BURST_DISTANCE_METERS) ||
-                    (timeDiff <= BURST_TIME_WINDOW_MS && sameVisit)) {
+                if (!photo.isRepresentative && !anchor.isRepresentative &&
+                    timeDiff <= BURST_TIME_WINDOW_MS && (dist <= BURST_DISTANCE_METERS || sameVisit) &&
+                    visuallyDuplicate(photo, anchor)) {
                     matchedCluster = cluster
                     break
                 }
@@ -124,7 +132,13 @@ object RepresentativeMediaSelector {
         val ranked = collapsed.sortedByDescending { scorePhoto(it) }
 
         val hero = ranked.firstOrNull()
-        val thumbnails = ranked.drop(1).take(maxThumbnails)
+        val alternatives = ranked.drop(1).toMutableList()
+        val thumbnails = mutableListOf<MediaItem>()
+        while(thumbnails.size < maxThumbnails && alternatives.isNotEmpty()) {
+            val used=(listOfNotNull(hero)+thumbnails).mapNotNull { it.visualFeatures?.category }.filter { it!="other" }
+            val next=alternatives.maxByOrNull { scorePhoto(it) - if(it.visualFeatures?.category in used && !it.isRepresentative) 180 else 0 }!!
+            alternatives.remove(next);thumbnails.add(next)
+        }
 
         return RepresentativeSelection(
             hero = hero,

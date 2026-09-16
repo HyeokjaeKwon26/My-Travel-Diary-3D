@@ -8,6 +8,7 @@ import android.os.Build
 import android.provider.MediaStore
 import androidx.exifinterface.media.ExifInterface
 import com.traveler.core.common.geo.GeoPoint
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -26,6 +27,12 @@ interface MediaRepository {
         startTimestampEpochMs: Long,
         endTimestampEpochMs: Long
     ): MediaScanResult = MediaScanResult(queryMediaCandidatesForDateRange(startTimestampEpochMs, endTimestampEpochMs))
+    suspend fun queryMediaWithProgress(start: Long, end: Long, progress: (Int, Int, Float) -> Unit): MediaScanResult {
+        val result = queryMediaWithDiagnostics(start,end)
+        progress(result.candidates.size,result.candidates.size,1f)
+        return result
+    }
+
 }
 
 class AndroidMediaStoreScanner(
@@ -40,7 +47,11 @@ class AndroidMediaStoreScanner(
     override suspend fun queryMediaWithDiagnostics(
         startTimestampEpochMs: Long,
         endTimestampEpochMs: Long
-    ): MediaScanResult = withContext(Dispatchers.IO) {
+    ): MediaScanResult = queryMediaWithProgress(startTimestampEpochMs,endTimestampEpochMs) { _,_,_ -> }
+
+    override suspend fun queryMediaWithProgress(start: Long, end: Long, progress: (Int, Int, Float) -> Unit): MediaScanResult = withContext(Dispatchers.IO) {
+        val startTimestampEpochMs = start
+        val endTimestampEpochMs = end
         val candidateMap = mutableMapOf<String, RawMediaCandidate>()
 
         val capabilities = MediaAccessCapabilities.checkCapabilities(context)
@@ -128,6 +139,8 @@ class AndroidMediaStoreScanner(
                     val dataCol = cursor.getColumnIndex(MediaStore.MediaColumns.DATA)
 
                     while (cursor.moveToNext()) {
+                        kotlinx.coroutines.currentCoroutineContext().ensureActive()
+                        progress(cursor.position, cursor.count, (if(prefix=="IMG") 0f else .5f) + .5f*cursor.position/maxOf(1,cursor.count))
                         val cursorId = cursor.getLong(idCol)
                         val compositeId = "${prefix}_$cursorId"
                         val name = cursor.getString(nameCol) ?: "MEDIA_$cursorId"
@@ -170,7 +183,8 @@ class AndroidMediaStoreScanner(
                         candidateMap[compositeId] = candidate
                     }
                 }
-            } catch (_: Exception) {
+            } catch(e: kotlinx.coroutines.CancellationException) { throw e }
+            catch (_: Exception) {
             }
         }
 
@@ -198,6 +212,8 @@ class AndroidMediaStoreScanner(
 
                         var count = 0
                         while (cursor.moveToNext() && count < 1000) {
+                            kotlinx.coroutines.currentCoroutineContext().ensureActive()
+                            progress(count, minOf(cursor.count,1000), .99f)
                             count++
                             val cursorId = cursor.getLong(idCol)
                             val compositeId = "${prefix}_$cursorId"
@@ -236,7 +252,8 @@ class AndroidMediaStoreScanner(
                             candidateMap[compositeId] = candidate
                         }
                     }
-                } catch (_: Exception) {}
+                } catch(e: kotlinx.coroutines.CancellationException) { throw e }
+                catch (_: Exception) {}
             }
         }
 
@@ -289,11 +306,13 @@ class AndroidMediaStoreScanner(
                         geoPoint = parseIso6709Location(locationString)
                     }
                 }
-            } catch (_: Exception) {
+            } catch(e: kotlinx.coroutines.CancellationException) { throw e }
+            catch (_: Exception) {
             } finally {
                 try {
                     retriever.release()
-                } catch (_: Exception) {}
+                } catch(e: kotlinx.coroutines.CancellationException) { throw e }
+                catch (_: Exception) {}
             }
         } else {
             try {

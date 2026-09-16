@@ -248,7 +248,7 @@ class TravelStoryTimeline private constructor(
                     isDayTransitionActive = isDayTransition,
                     currentAltitudeMeters = alt,
                     currentSpeedKmh = 0.0,
-                    currentTraveledDistanceMeters = distBefore,
+                    currentTraveledDistanceMeters = minOf(totalTripDistanceMeters,distBefore),
                     totalTripDistanceMeters = totalTripDistanceMeters
                 )
             }
@@ -339,7 +339,7 @@ class TravelStoryTimeline private constructor(
                 val currentTraveledDist = if (isSyntheticBridge) {
                     distBefore
                 } else {
-                    minOf(totalTripDistanceMeters, distBefore + targetDist)
+                    minOf(totalTripDistanceMeters, distBefore + seg.distanceMeters * (targetDist / maxOf(1.0,totalDist)).coerceIn(0.0,1.0))
                 }
 
                 TravelPlaybackState(
@@ -570,13 +570,15 @@ class TravelStoryTimeline private constructor(
                                 item.isUserOverride -> 2.5f
                                 else -> 2.0f
                             }
-                            val duration = maxOf(1.2f, baseDuration * durationMultiplier)
+                            val duration = maxOf(1.2f, baseDuration * durationMultiplier, vMoments.size*2.6f+.6f)
                             rawEpisodes.add(StoryEpisode.VisitEpisode(visit = item, durationStorySeconds = duration))
                         }
                     }
                     is MovementSegment -> {
                         if (resolvedSegments.size <= 10 || item.id in keySegmentIds) {
-                            rawEpisodes.add(buildMovementEpisode(item, durationMultiplier))
+                            val movement = buildMovementEpisode(item, durationMultiplier)
+                            val count = photoMoments.count { it.parentType == "MOVEMENT" && it.parentId == item.id }
+                            rawEpisodes.add(movement.copy(durationStorySeconds=maxOf(movement.durationStorySeconds,count*2.6f+.6f)))
                         }
                     }
                 }
@@ -633,8 +635,19 @@ class TravelStoryTimeline private constructor(
                                     connectedEpisodes.add(realEp)
                                 }
                             }
-                            // A missing recording is not evidence of a straight road or flight.
-                            // Leave the gap explicit rather than manufacturing a transport episode.
+                            else if (gapEnd > gapStart) {
+                                // Presentation-only connection; never persist it or count it as recorded distance.
+                                val bridge = MovementSegment(
+                                    id = "bridge_${curr.stableId}_${next.stableId}",
+                                    startTimestampEpochMs = gapStart, endTimestampEpochMs = gapEnd,
+                                    startPoint = currEndPos, endPoint = nextStartPos,
+                                    distanceMeters = 0.0, durationMillis = gapEnd-gapStart,
+                                    transport = TransportPrediction(TransportMode.UNKNOWN, 0f, "Display-only estimated connection"),
+                                    geometryProvenance = GeometryProvenance.CONTINUITY_ESTIMATE
+                                )
+                                connectedEpisodes.add(buildMovementEpisode(bridge, durationMultiplier).copy(
+                                    durationStorySeconds = (2.0 + kotlin.math.ln(1.0+gapDist/1000.0)*.5).toFloat().coerceIn(2f,5f)))
+                            }
                         } else {
                             overlapGeneratedBridgeAttempts++
                         }
@@ -692,7 +705,7 @@ class TravelStoryTimeline private constructor(
                 if (ep is StoryEpisode.MovementEpisode) {
                     val isSyntheticBridge = ep.segment.id.startsWith("bridge_")
                     if (!isSyntheticBridge) {
-                        accDist += ep.totalDistanceMeters
+                        accDist += ep.segment.distanceMeters
                     }
                 }
             }
@@ -725,7 +738,7 @@ class TravelStoryTimeline private constructor(
                     val epRealDurationMs = maxOf(1L, ep.endTimestampEpochMs - ep.startTimestampEpochMs)
                     var prevEndStoryTime = epStart
 
-                    for (moment in epMoments) {
+                    for ((momentIndex,moment) in epMoments.withIndex()) {
                         val realFrac = ((moment.effectiveStoryTimestampEpochMs - ep.startTimestampEpochMs).toDouble() / epRealDurationMs.toDouble()).toFloat().coerceIn(0.05f, 0.95f)
 
                         val baseDisplayDuration = if (moment.photo.isRepresentative) 2.5f else 1.8f
@@ -736,7 +749,9 @@ class TravelStoryTimeline private constructor(
                         // P2-04 Arrival moment: settle destination visual before photo appears
                         val visitSettlingOffset = if (ep is StoryEpisode.VisitEpisode) minOf(0.35f, epDur * 0.12f) else 0f
                         val earliestStart = maxOf(epStart + visitSettlingOffset, prevEndStoryTime + 0.05f)
-                        val rawDisplayStart = maxOf(earliestStart, targetCenterTime - displayDuration / 2.0f)
+                        val remaining = epMoments.size - momentIndex
+                        val latestStart = epStart + epDur - remaining*(displayDuration+.05f)
+                        val rawDisplayStart = maxOf(earliestStart, minOf(latestStart,targetCenterTime - displayDuration / 2.0f))
                         val rawDisplayEnd = minOf(epStart + epDur, rawDisplayStart + displayDuration)
 
                         // P0-01 HARD INVARIANT: photo window must lie strictly within parent episode
@@ -821,7 +836,9 @@ class TravelStoryTimeline private constructor(
                 TransportMode.BICYCLE -> 2.8f
                 else -> 2.2f
             }
-            val duration = maxOf(1.2f, baseDuration * durationMultiplier)
+            val routeDuration = if(item.geometryProvenance==GeometryProvenance.CONTINUITY_ESTIMATE) baseDuration else
+                maxOf(baseDuration,(baseDuration + kotlin.math.ln(1.0+runningDist/5000.0)*1.8).toFloat().coerceAtMost(18f))
+            val duration = maxOf(1.2f, routeDuration * durationMultiplier)
 
             return StoryEpisode.MovementEpisode(
                 segment = item,

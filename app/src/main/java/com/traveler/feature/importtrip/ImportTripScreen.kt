@@ -17,6 +17,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -42,8 +43,9 @@ fun ImportTripScreen(
     var selectedFileUri by remember { mutableStateOf<Uri?>(null) }
     var selectedFileName by remember { mutableStateOf<String?>(null) }
     var tripTitle by remember { mutableStateOf("") }
-    var startDateText by remember { mutableStateOf(LocalDate.now().minusDays(7).toString()) }
-    var endDateText by remember { mutableStateOf(LocalDate.now().toString()) }
+    var startDateText by rememberSaveable { mutableStateOf(LocalDate.now().minusDays(7).toString()) }
+    var endDateText by rememberSaveable { mutableStateOf(LocalDate.now().toString()) }
+    var showDatePicker by rememberSaveable { mutableStateOf(false) }
     var dateError by remember { mutableStateOf<String?>(null) }
 
     var mediaCapabilities by remember { mutableStateOf(MediaAccessCapabilities.checkCapabilities(context)) }
@@ -88,6 +90,33 @@ fun ImportTripScreen(
             val tripId = (uiState as ImportUiState.Success).tripId
             viewModel.resetState()
             onNavigateToTripDetail(tripId)
+        }
+    }
+
+    if (showDatePicker) {
+        // Material pickers represent calendar dates at UTC midnight, not local instants.
+        val range = rememberDateRangePickerState(
+            initialSelectedStartDateMillis = LocalDate.parse(startDateText).toEpochDay() * 86_400_000L,
+            initialSelectedEndDateMillis = LocalDate.parse(endDateText).toEpochDay() * 86_400_000L
+        )
+        androidx.compose.ui.window.Dialog(onDismissRequest = { showDatePicker = false },
+            properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false)) {
+            Surface(modifier = Modifier.widthIn(max = 600.dp).fillMaxWidth().fillMaxHeight(.95f), shape = RoundedCornerShape(20.dp)) {
+                Column {
+                    DateRangePicker(state = range, showModeToggle = false, modifier = Modifier.weight(1f),
+                        title = { Text("Select travel dates", Modifier.padding(16.dp)) })
+                    Row(Modifier.fillMaxWidth().padding(8.dp), horizontalArrangement = Arrangement.End) {
+                        TextButton(onClick = { showDatePicker = false }) { Text("Cancel") }
+                        TextButton(enabled = range.selectedStartDateMillis != null && range.selectedEndDateMillis != null,
+                            onClick = {
+                                startDateText = LocalDate.ofEpochDay(range.selectedStartDateMillis!! / 86_400_000L).toString()
+                                endDateText = LocalDate.ofEpochDay(range.selectedEndDateMillis!! / 86_400_000L).toString()
+                                dateError = null
+                                showDatePicker = false
+                            }) { Text("Use dates") }
+                    }
+                }
+            }
         }
     }
 
@@ -296,32 +325,13 @@ fun ImportTripScreen(
                             singleLine = true
                         )
 
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(12.dp)
-                        ) {
-                            OutlinedTextField(
-                                value = startDateText,
-                                onValueChange = {
-                                    startDateText = it
-                                    dateError = null
-                                },
-                                label = { Text("Start Date (YYYY-MM-DD)") },
-                                isError = dateError != null,
-                                modifier = Modifier.weight(1f),
-                                singleLine = true
-                            )
-                            OutlinedTextField(
-                                value = endDateText,
-                                onValueChange = {
-                                    endDateText = it
-                                    dateError = null
-                                },
-                                label = { Text("End Date (YYYY-MM-DD)") },
-                                isError = dateError != null,
-                                modifier = Modifier.weight(1f),
-                                singleLine = true
-                            )
+                        OutlinedButton(onClick = { showDatePicker = true }, modifier = Modifier.fillMaxWidth()) {
+                            Icon(Icons.Default.DateRange, contentDescription = null)
+                            Spacer(Modifier.width(8.dp))
+                            Column {
+                                Text("$startDateText → $endDateText")
+                                Text("${java.time.temporal.ChronoUnit.DAYS.between(LocalDate.parse(startDateText), LocalDate.parse(endDateText)) + 1} days · Select dates")
+                            }
                         }
 
                         if (dateError != null) {
@@ -400,9 +410,18 @@ fun ImportTripScreen(
                             horizontalAlignment = Alignment.CenterHorizontally,
                             verticalArrangement = Arrangement.Center
                         ) {
-                            CircularProgressIndicator()
+                            val estimator = remember(state.startedMs) { com.traveler.domain.usecase.ImportProgressEstimator(state.startedMs) }
+                            var now by remember { mutableStateOf(android.os.SystemClock.elapsedRealtime()) }
+                            LaunchedEffect(state.startedMs) { while(true) { kotlinx.coroutines.delay(1000); now = android.os.SystemClock.elapsedRealtime() } }
+                            state.progress?.let { p ->
+                                LinearProgressIndicator(progress = { p.fraction }, modifier = Modifier.fillMaxWidth(.8f))
+                                Text("${(p.fraction*100).toInt()}%", Modifier.padding(12.dp), style = MaterialTheme.typography.headlineSmall)
+                                if (p.completed != null && p.total != null) Text("${p.completed} / ${p.total}")
+                                Text(estimator.remaining(p, now), Modifier.padding(8.dp))
+                            } ?: CircularProgressIndicator()
                             Spacer(modifier = Modifier.height(16.dp))
-                            Text(text = state.status, fontWeight = FontWeight.Medium)
+                            Text(text = state.status, modifier = Modifier.padding(16.dp), fontWeight = FontWeight.Medium)
+                            TextButton(onClick = { viewModel.cancelImport() }) { Text("Cancel") }
                         }
                     }
                 }

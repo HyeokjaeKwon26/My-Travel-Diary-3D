@@ -19,8 +19,10 @@ android {
         applicationId = "com.traveler.threed"
         minSdk = 26
         targetSdk = 36
-        versionCode = 5
-        versionName = "1.0.0-rc4"
+        // Optional device-specific distribution APK; CI/default keeps all supported ABIs.
+        providers.gradleProperty("targetAbi").orNull?.let { ndk.abiFilters.add(it) }
+        versionCode = 6
+        versionName = "1.0.0-rc5"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
@@ -132,6 +134,8 @@ dependencies {
     ksp("androidx.room:room-compiler:$roomVersion")
     testImplementation("androidx.room:room-testing:$roomVersion")
     androidTestImplementation("androidx.room:room-testing:$roomVersion")
+
+    implementation("com.google.mlkit:image-labeling:17.0.9")
 
     // Media & EXIF
     implementation("androidx.exifinterface:exifinterface:1.3.7")

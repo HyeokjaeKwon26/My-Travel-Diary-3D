@@ -11,7 +11,7 @@ data class StreetTilePlan(val tiles:List<StreetTile>,val zoom:Int) {
         /** Current visible footprint only; never a journey corridor or zoom stack. */
         fun visible(f:MapFootprint,width:Int,height:Int):StreetTilePlan {
             val span=max(f.right-f.left,f.bottom-f.top).coerceAtLeast(1e-8)
-            var z=floor(log2(max(width,height)/(384.0*span))).toInt().coerceIn(2,17)
+            var z=ceil(log2(max(width,height)/(256.0*span))).toInt().coerceIn(2,17)
             fun tiles(zoom:Int):List<StreetTile> {
                 val n=1 shl zoom
                 val x0=floor(f.left*n).toInt();val x1=floor(f.right*n-1e-9).toInt().coerceAtLeast(x0)
@@ -22,7 +22,14 @@ data class StreetTilePlan(val tiles:List<StreetTile>,val zoom:Int) {
             }
             var result=tiles(z)
             while(result.isEmpty() && z>0) { z--;result=tiles(z) }
-            return StreetTilePlan(result,z)
+            val n = (1 shl z).toDouble()
+            val cx = (f.left+f.right)*.5*n
+            val cy = (f.top+f.bottom)*.5*n
+            return StreetTilePlan(result.sortedBy { t ->
+                val dx = t.x+.5-cx
+                val wrapped = dx-round(dx/n)*n
+                wrapped*wrapped+(t.y+.5-cy).pow(2)
+            },z)
         }
     }
 }

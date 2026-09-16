@@ -31,7 +31,8 @@ class TravelVideoRenderer(
     private val timeline: TravelStoryTimeline,
     private val generalizeHomeAddress: Boolean = true,
     private val sceneGeometry: com.traveler.feature.map.threed.SceneGeometry =
-        com.traveler.feature.map.threed.SceneGeometry(renderModel, timeline, emptyList())
+        com.traveler.feature.map.threed.SceneGeometry(renderModel, timeline, emptyList()),
+    private val streetCacheDirectory: java.io.File? = null
 ) {
     private val mapRenderer = TravelMapRenderer(basemapStream).apply {
         RegionalBasemapCache.preparedRegionalBasemap?.let { setPreparedRegionalBasemap(it) }
@@ -44,12 +45,13 @@ class TravelVideoRenderer(
     }
     private var glRenderer: com.traveler.feature.map.threed.TravelGlRenderer? = null
     private val calmCamera = true
-    private val mapScale=context.getSharedPreferences("scene_preferences",0).getFloat("mapScale",1f).toDouble()
+    private val mapScale=1.0
 
     fun renderGlFrame(surface: CodecInputSurface, bitmap: Bitmap, canvas: Canvas, width: Int, height: Int,
                       storySeconds: Float, ptsNs: Long) {
         surface.makeCurrent()
-        val gl = glRenderer ?: com.traveler.feature.map.threed.TravelGlRenderer(context, sceneGeometry)
+        val gl = glRenderer ?: com.traveler.feature.map.threed.TravelGlRenderer(context, sceneGeometry,
+            com.traveler.feature.map.threed.StreetMapSession(context,cacheDirectory=streetCacheDirectory ?: java.io.File(context.cacheDir,"street_maps_v1")))
             .also { it.initialize(); glRenderer = it }
         gl.render(width, height, timeline.evaluateAtStoryTime(storySeconds), calmCamera,mapScale)
         canvas.drawColor(Color.TRANSPARENT, PorterDuff.Mode.CLEAR)
@@ -117,7 +119,7 @@ class TravelVideoRenderer(
         if (!renderMap && sceneGeometry.uncertain(playbackState)) {
             subtitlePaint.textSize = width * .026f
             canvas.drawRoundRect(width*.12f, height*.46f, width*.88f, height*.51f, 16f, 16f, cardBackgroundPaint)
-            canvas.drawText("Elevation uncertain • vehicle hidden", width*.5f, height*.492f, subtitlePaint)
+            canvas.drawText("Height estimated", width*.5f, height*.492f, subtitlePaint)
         }
 
         // 2. Active Photo Moment Card Overlay (Top-Right / Side)
@@ -149,6 +151,11 @@ class TravelVideoRenderer(
 
     }
 
+    private fun fitText(paint: Paint, text: String, width: Float) {
+        val measured = paint.measureText(text)
+        if (measured > width) paint.textSize *= width / measured
+    }
+
     private fun renderPhotoOverlay(
         canvas: Canvas,
         width: Int,
@@ -156,8 +163,8 @@ class TravelVideoRenderer(
         photo: MediaItem,
         placeName: String?
     ) {
-        val cardWidth = width * 0.38f
-        val cardHeight = height * 0.22f
+        val cardWidth = width * if (width > height) 0.25f else 0.38f
+        val cardHeight = height * if (width > height) 0.34f else 0.22f
         val cardLeft = width - cardWidth - (width * 0.04f)
         val cardTop = height * 0.08f
         val rect = RectF(cardLeft, cardTop, cardLeft + cardWidth, cardTop + cardHeight)
@@ -214,6 +221,7 @@ class TravelVideoRenderer(
             textAlign = Paint.Align.CENTER
         }
         val textY = rect.bottom - (cardHeight * 0.07f)
+        fitText(textPaint, label, cardWidth * .9f)
         canvas.drawText(label, rect.centerX(), textY, textPaint)
     }
 
@@ -254,6 +262,7 @@ class TravelVideoRenderer(
             color = Color.argb((220 * alphaFraction).toInt(), 226, 232, 240)
         }
 
+        fitText(titlePaint, card.title, cardWidth * .9f)
         canvas.drawText(card.title, rect.centerX(), rect.top + cardHeight * 0.36f, titlePaint)
         canvas.drawText(card.dateRangeStr, rect.centerX(), rect.top + cardHeight * 0.62f, subtitlePaint)
         canvas.drawText(card.subtitle, rect.centerX(), rect.top + cardHeight * 0.82f, subtitlePaint)
@@ -296,6 +305,7 @@ class TravelVideoRenderer(
             color = Color.argb((230 * alphaFraction).toInt(), 241, 245, 249)
         }
 
+        fitText(titlePaint, card.title, cardWidth * .9f)
         canvas.drawText(card.title, rect.centerX(), rect.top + cardHeight * 0.28f, titlePaint)
         canvas.drawText("${card.totalDaysStr} · ${card.totalDistanceStr}", rect.centerX(), rect.top + cardHeight * 0.52f, subtitlePaint)
         canvas.drawText("${card.memoriesCountStr} · My Travel Diary 3D", rect.centerX(), rect.top + cardHeight * 0.74f, subtitlePaint)
