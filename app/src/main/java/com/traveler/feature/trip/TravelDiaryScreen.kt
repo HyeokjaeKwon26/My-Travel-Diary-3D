@@ -13,6 +13,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.*
@@ -56,6 +57,7 @@ fun TravelDiaryScreen(
 
     var viewingGalleryPhotos by remember { mutableStateOf<List<MediaItem>?>(null) }
     var isExportVideoOpen by remember { mutableStateOf(false) }
+    var showMapOptions by remember { mutableStateOf(false) }
 
     LaunchedEffect(tripId) {
         viewModel.loadTrip(tripId)
@@ -75,6 +77,9 @@ fun TravelDiaryScreen(
                 },
                 actions = {
                     if (uiState is TripDetailUiState.Success) {
+                        IconButton(onClick = { showMapOptions = true }) {
+                            Icon(Icons.Default.Settings, contentDescription = "Map settings")
+                        }
                         IconButton(onClick = { isExportVideoOpen = true }) {
                             Icon(Icons.Default.PlayArrow, contentDescription = "Export Video", tint = MaterialTheme.colorScheme.primary)
                         }
@@ -144,6 +149,9 @@ fun TravelDiaryScreen(
                             segments = allSegments,
                             photos = allPhotos,
                             focusedLocation = focusedLocation,
+                            tripStartDateIso = trip.startDateIso,
+                            showMapOptions = showMapOptions,
+                            onDismissMapOptions = { showMapOptions = false },
                             modifier = Modifier.fillMaxSize()
                         )
                     }, diary = {

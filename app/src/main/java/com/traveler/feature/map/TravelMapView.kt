@@ -1,10 +1,8 @@
 package com.traveler.feature.map
 
 import androidx.compose.animation.*
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas as ComposeCanvas
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
@@ -19,21 +17,16 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.nativeCanvas
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.text.style.TextOverflow
-import coil.compose.AsyncImage
 import com.traveler.core.common.geo.GeoPoint
 import com.traveler.core.model.MediaItem
 import com.traveler.core.model.MovementSegment
-import com.traveler.core.model.TransportMode
 import com.traveler.core.model.Visit
 import com.traveler.feature.map.audio.TravelSoundtrackPlayer
 import com.traveler.feature.map.renderer.*
@@ -48,7 +41,10 @@ fun TravelMapView(
     focusedLocation: GeoPoint? = null,
     initialIsPlaying: Boolean = false,
     initialPlaybackProgress: Float = 0.0f,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    tripStartDateIso: String? = null,
+    showMapOptions: Boolean = false,
+    onDismissMapOptions: () -> Unit = {}
 ) {
     val context = LocalContext.current
     val view = LocalView.current
@@ -105,6 +101,7 @@ fun TravelMapView(
 
     var isPlaying by remember(initialIsPlaying) { mutableStateOf(initialIsPlaying) }
     var playbackProgress by remember(initialPlaybackProgress) { mutableStateOf(initialPlaybackProgress) }
+    var playbackSession by remember(initialIsPlaying, initialPlaybackProgress) { mutableStateOf(initialIsPlaying || initialPlaybackProgress > 0f) }
     var playbackSpeed by remember { mutableStateOf(1.0f) }
     val playbackLifecycle = androidx.compose.ui.platform.LocalLifecycleOwner.current.lifecycle
     DisposableEffect(playbackLifecycle) {
@@ -180,20 +177,21 @@ fun TravelMapView(
         }
     }
 
-    val currentActiveState = if (isPlaying || playbackProgress > 0f) {
+    val currentActiveState = if (playbackSession) {
         storyTimeline.evaluate(playbackProgress)
     } else {
         null
     }
 
-    val isPlaybackActive = isPlaying || playbackProgress > 0f
+    val isPlaybackActive = playbackSession
 
     Box(
         // SurfaceView must punch through the window directly. An offscreen Compose
         // clipping layer covers its separate GPU surface on some Android versions.
         modifier = modifier
     ) {
-        com.traveler.feature.map.threed.Map3DLayer(renderModel, storyTimeline, currentActiveState, isPlaying) {
+        com.traveler.feature.map.threed.Map3DLayer(renderModel, storyTimeline, currentActiveState, isPlaying,
+            showOptions = showMapOptions, onDismissOptions = onDismissMapOptions) {
     LaunchedEffect(Unit) {
         if (!RegionalBasemapCache.isReady) {
             val prep = RegionalBasemapCache.ensureLoaded(context.applicationContext)
@@ -210,7 +208,7 @@ fun TravelMapView(
             if (regionalBasemapVersion < 0) return@ComposeCanvas // Observes state to trigger redraw when prepared
 
             val progress = playbackProgress
-            val active = isPlaying || progress > 0f
+            val active = playbackSession
             val canvasPlaybackState = if (active) storyTimeline.evaluate(progress) else null
             if (canvasPlaybackState != null && isPlaying) {
                 continuityDiagnostic.recordFrame(canvasPlaybackState, isUserScrubbing = false)
@@ -236,136 +234,15 @@ fun TravelMapView(
         }
 
         }
-        Column(
-            modifier = Modifier
-                .align(Alignment.TopStart)
-                .fillMaxWidth(.62f)
-                .padding(10.dp),
-            verticalArrangement = Arrangement.spacedBy(6.dp)
-        ) {
-            if (!isPlaybackActive) {
-                // Static Overview Badge: Total Trip Distance
-                Box(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(Color(0xFF0F172A).copy(alpha = 0.85f))
-                        .padding(horizontal = 10.dp, vertical = 5.dp)
-                ) {
-                    val totalKm = storyTimeline.totalTripDistanceMeters / 1000.0
-                    val formattedTotal = String.format(java.util.Locale.US, "%,.1f km", totalKm)
-                    Text(
-                        text = "🗺️ Total Journey: $formattedTotal",
-                        color = Color.White,
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.SemiBold
-                    )
-                }
-            } else if (currentActiveState != null) {
-                val mode = currentActiveState.currentTransportMode
-
-                // Traveled Distance / Total Trip Distance (100% matched with summary dashboard)
-                val curDistKm = currentActiveState.currentTraveledDistanceMeters / 1000.0
-                val totalDistKm = currentActiveState.totalTripDistanceMeters / 1000.0
-                val distFraction = (curDistKm / maxOf(0.1, totalDistKm)).toFloat().coerceIn(0f, 1f)
-
-                val curDistFormatted = if (curDistKm >= 1000.0) {
-                    String.format(java.util.Locale.US, "%,.1f km", curDistKm)
-                } else if (curDistKm >= 100.0) {
-                    String.format(java.util.Locale.US, "%.1f km", curDistKm)
-                } else {
-                    String.format(java.util.Locale.US, "%.1f km", curDistKm)
-                }
-                val totalDistFormatted = String.format(java.util.Locale.US, "/ %,.1f km", totalDistKm)
-
-                // Adventure Cockpit Glass Card (Distance Progress)
-                Box(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(Color(0xFF0B1329).copy(alpha = 0.88f))
-                        .border(1.dp, Color(0xFF38BDF8).copy(alpha = 0.40f), RoundedCornerShape(12.dp))
-                        .padding(horizontal = 12.dp, vertical = 8.dp)
-                ) {
-                    Column(
-                        verticalArrangement = Arrangement.spacedBy(5.dp),
-                        modifier = Modifier.widthIn(max = 200.dp)
-                    ) {
-                        // Top row: Transport Mode or Place (Speed removed per user request)
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(5.dp),
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Text(text = mode.emoji, fontSize = 13.sp)
-                            val modeLabel = if (currentActiveState.isTitleCardActive || currentActiveState.isEndCardActive) {
-                                "Journey overview"
-                            } else if (currentActiveState.currentSegment?.id?.startsWith("bridge_")==true) {
-                                "Estimated connection"
-                            } else if (currentActiveState.currentVisit != null) {
-                                currentActiveState.currentVisit.placeName ?: "Stop"
-                            } else {
-                                mode.name.lowercase().replaceFirstChar { it.uppercase() }
-                            }
-                            Text(
-                                text = modeLabel,
-                                color = Color.White,
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.Bold,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                                softWrap = false
-                            )
-                        }
-
-                        // Middle row: Current Traveled Distance / Total Trip Distance
-                        Column(
-                            verticalArrangement = Arrangement.spacedBy(2.dp),
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Text(
-                                text = curDistFormatted,
-                                color = Color(0xFF38BDF8),
-                                fontSize = 15.sp,
-                                fontWeight = FontWeight.ExtraBold,
-                                maxLines = 1,
-                                softWrap = false
-                            )
-                            Text(
-                                text = totalDistFormatted,
-                                color = Color(0xFF94A3B8),
-                                fontSize = 10.sp,
-                                fontWeight = FontWeight.SemiBold,
-                                maxLines = 1,
-                                softWrap = false
-                            )
-                        }
-
-                        // Bottom row: Visual Journey Progress Gauge Bar
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(4.dp)
-                                .clip(RoundedCornerShape(2.dp))
-                                .background(Color.White.copy(alpha = 0.15f))
-                        ) {
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxWidth(maxOf(0.04f, distFraction))
-                                    .fillMaxHeight()
-                                    .clip(RoundedCornerShape(2.dp))
-                                    .background(
-                                        Brush.horizontalGradient(
-                                            listOf(
-                                                Color(0xFF38BDF8),
-                                                Color(0xFF818CF8),
-                                                Color(0xFF34D399)
-                                            )
-                                        )
-                                    )
-                            )
-                        }
-                    }
-                }
-            }
+        if (currentActiveState != null) {
+            PlaybackOverlays(currentActiveState, storyTimeline, tripStartDateIso)
+        } else {
+            Text(
+                text = "Total journey: " + String.format(java.util.Locale.US, "%,.1f km", storyTimeline.totalTripDistanceMeters / 1000),
+                color = Color.White, fontSize = 11.sp,
+                modifier = Modifier.align(Alignment.TopStart).padding(8.dp)
+                    .background(Color(0xDD0F172A), RoundedCornerShape(8.dp)).padding(8.dp)
+            )
         }
 
         // Static Mode Clean Floating Replay Button
@@ -374,6 +251,7 @@ fun TravelMapView(
                 onClick = {
                     playbackProgress = 0.0f
                     timeTracker.seekTo(0.0f)
+                    playbackSession = true
                     isPlaying = true
                 },
                 modifier = Modifier
@@ -389,74 +267,6 @@ fun TravelMapView(
                     contentDescription = "Start Playback",
                     modifier = Modifier.size(24.dp)
                 )
-            }
-        }
-
-        // P2-08: Day Transition Indicator Banner
-        AnimatedVisibility(
-            visible = currentActiveState?.isDayTransitionActive == true && !currentActiveState.dayTransitionLabel.isNullOrBlank(),
-            enter = fadeIn(animationSpec = tween(300)) + expandVertically(),
-            exit = fadeOut(animationSpec = tween(400)) + shrinkVertically(),
-            modifier = Modifier
-                .align(Alignment.TopCenter)
-                .padding(top = 10.dp)
-        ) {
-            Box(
-                modifier = Modifier
-                    .clip(RoundedCornerShape(16.dp))
-                    .background(Color(0xFF0F172A).copy(alpha = 0.88f))
-                    .padding(horizontal = 14.dp, vertical = 5.dp)
-            ) {
-                Text(
-                    text = currentActiveState?.dayTransitionLabel ?: "",
-                    color = Color.White,
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.Bold
-                )
-            }
-        }
-
-        // P2-10: Active Photo Moment Card Overlay with Ken Burns entrance during Playback
-        AnimatedVisibility(
-            visible = currentActiveState?.activePhoto != null,
-            enter = fadeIn(animationSpec = tween(350)) + scaleIn(initialScale = 0.90f, animationSpec = tween(350)),
-            exit = fadeOut(animationSpec = tween(250)) + scaleOut(targetScale = 0.95f, animationSpec = tween(250)),
-            modifier = Modifier
-                .align(Alignment.TopEnd)
-                .padding(10.dp)
-        ) {
-            currentActiveState?.activePhoto?.let { photo ->
-                val isHero = photo.isRepresentative
-                Card(
-                    shape = RoundedCornerShape(10.dp),
-                    colors = CardDefaults.cardColors(containerColor = Color.Black.copy(alpha = 0.88f)),
-                    modifier = Modifier.width(if (isHero) 150.dp else 130.dp)
-                ) {
-                    Column(modifier = Modifier.padding(5.dp)) {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(if (isHero) 95.dp else 80.dp)
-                                .clip(RoundedCornerShape(8.dp))
-                        ) {
-                            AsyncImage(
-                                model = photo.contentUriString,
-                                contentDescription = photo.fileName,
-                                contentScale = ContentScale.Crop,
-                                modifier = Modifier.fillMaxSize()
-                            )
-                        }
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Text(
-                            text = currentActiveState.currentVisit?.placeName ?: photo.fileName,
-                            color = Color.White,
-                            fontSize = 10.sp,
-                            fontWeight = FontWeight.Bold,
-                            maxLines = 1,
-                            modifier = Modifier.padding(horizontal = 2.dp)
-                        )
-                    }
-                }
             }
         }
 
@@ -584,6 +394,7 @@ fun TravelMapView(
                     IconButton(
                         onClick = {
                             isPlaying = false
+                            playbackSession = false
                             soundtrackPlayer.stop()
                             timeTracker.pause()
                             timeTracker.seekTo(0.0f)

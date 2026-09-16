@@ -94,26 +94,41 @@ fun ImportTripScreen(
     }
 
     if (showDatePicker) {
+        // Some edge-to-edge Dialog windows report zero Compose insets on Android 15+.
+        // Union with the host window's unconsumed system insets so confirmation stays
+        // clear of both gesture navigation and the three-button navigation bar.
+        val configuration = androidx.compose.ui.platform.LocalConfiguration.current
+        val hostView = androidx.compose.ui.platform.LocalView.current
+        val hostInsets = remember(configuration, hostView) {
+            androidx.core.view.ViewCompat.getRootWindowInsets(hostView)?.getInsets(
+                androidx.core.view.WindowInsetsCompat.Type.systemBars() or
+                    androidx.core.view.WindowInsetsCompat.Type.displayCutout())
+        }
+        val hostSafeArea = WindowInsets(hostInsets?.left ?: 0, hostInsets?.top ?: 0,
+            hostInsets?.right ?: 0, hostInsets?.bottom ?: 0)
         // Material pickers represent calendar dates at UTC midnight, not local instants.
         val range = rememberDateRangePickerState(
             initialSelectedStartDateMillis = LocalDate.parse(startDateText).toEpochDay() * 86_400_000L,
             initialSelectedEndDateMillis = LocalDate.parse(endDateText).toEpochDay() * 86_400_000L
         )
         androidx.compose.ui.window.Dialog(onDismissRequest = { showDatePicker = false },
-            properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false)) {
-            Surface(modifier = Modifier.widthIn(max = 600.dp).fillMaxWidth().fillMaxHeight(.95f), shape = RoundedCornerShape(20.dp)) {
-                Column {
-                    DateRangePicker(state = range, showModeToggle = false, modifier = Modifier.weight(1f),
-                        title = { Text("Select travel dates", Modifier.padding(16.dp)) })
-                    Row(Modifier.fillMaxWidth().padding(8.dp), horizontalArrangement = Arrangement.End) {
-                        TextButton(onClick = { showDatePicker = false }) { Text("Cancel") }
-                        TextButton(enabled = range.selectedStartDateMillis != null && range.selectedEndDateMillis != null,
-                            onClick = {
-                                startDateText = LocalDate.ofEpochDay(range.selectedStartDateMillis!! / 86_400_000L).toString()
-                                endDateText = LocalDate.ofEpochDay(range.selectedEndDateMillis!! / 86_400_000L).toString()
-                                dateError = null
-                                showDatePicker = false
-                            }) { Text("Use dates") }
+            properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false)) {
+            Box(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing.union(hostSafeArea)).imePadding().padding(8.dp),
+                contentAlignment = Alignment.Center) {
+                Surface(modifier = Modifier.widthIn(max = 600.dp).fillMaxWidth().fillMaxHeight(), shape = RoundedCornerShape(20.dp)) {
+                    Column {
+                        DateRangePicker(state = range, showModeToggle = false, modifier = Modifier.weight(1f),
+                            title = { Text("Select travel dates", Modifier.padding(16.dp)) })
+                        Row(Modifier.fillMaxWidth().heightIn(min = 56.dp).padding(8.dp), horizontalArrangement = Arrangement.End) {
+                            TextButton(onClick = { showDatePicker = false }) { Text("Cancel") }
+                            TextButton(enabled = range.selectedStartDateMillis != null && range.selectedEndDateMillis != null,
+                                onClick = {
+                                    startDateText = LocalDate.ofEpochDay(range.selectedStartDateMillis!! / 86_400_000L).toString()
+                                    endDateText = LocalDate.ofEpochDay(range.selectedEndDateMillis!! / 86_400_000L).toString()
+                                    dateError = null
+                                    showDatePicker = false
+                                }) { Text("Use dates") }
+                        }
                     }
                 }
             }

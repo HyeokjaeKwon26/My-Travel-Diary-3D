@@ -4,6 +4,8 @@ import android.content.Context
 import android.graphics.*
 import androidx.exifinterface.media.ExifInterface
 import com.traveler.core.model.MediaItem
+import com.traveler.feature.map.renderer.PlaybackOverlayContent
+import com.traveler.feature.map.renderer.TravelPlaybackState
 import com.traveler.feature.map.renderer.RegionalBasemapCache
 import com.traveler.feature.map.renderer.SafeContentInsets
 import com.traveler.feature.map.renderer.TravelMapRenderModel
@@ -32,7 +34,8 @@ class TravelVideoRenderer(
     private val generalizeHomeAddress: Boolean = true,
     private val sceneGeometry: com.traveler.feature.map.threed.SceneGeometry =
         com.traveler.feature.map.threed.SceneGeometry(renderModel, timeline, emptyList()),
-    private val streetCacheDirectory: java.io.File? = null
+    private val streetCacheDirectory: java.io.File? = null,
+    private val tripStartDateIso: String? = null
 ) {
     private val mapRenderer = TravelMapRenderer(basemapStream).apply {
         RegionalBasemapCache.preparedRegionalBasemap?.let { setPreparedRegionalBasemap(it) }
@@ -122,6 +125,8 @@ class TravelVideoRenderer(
             canvas.drawText("Height estimated", width*.5f, height*.492f, subtitlePaint)
         }
 
+        renderPlaybackHeader(canvas, width, height, playbackState)
+
         // 2. Active Photo Moment Card Overlay (Top-Right / Side)
         playbackState.activePhoto?.let { photo ->
             renderPhotoOverlay(canvas, width, height, photo, playbackState.currentVisit?.placeName)
@@ -156,73 +161,67 @@ class TravelVideoRenderer(
         if (measured > width) paint.textSize *= width / measured
     }
 
+    private fun drawFittedText(canvas: Canvas, text: String, x: Float, y: Float, width: Float, paint: Paint) {
+        val originalSize = paint.textSize
+        fitText(paint, text, width)
+        canvas.drawText(text, x, y, paint)
+        paint.textSize = originalSize
+    }
+
+    private fun renderPlaybackHeader(canvas: Canvas, width: Int, height: Int, state: TravelPlaybackState) {
+        val unit = minOf(width, height) / 360f
+        val margin = 8 * unit
+        val text = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.WHITE; typeface = Typeface.DEFAULT_BOLD; textSize = 11 * unit }
+        val date = PlaybackOverlayContent.date(state, timeline)
+        val dateWidth = text.measureText(date) + 16 * unit
+        val dateLeft = width - margin - dateWidth
+        val cardWidth = minOf(200 * unit, dateLeft - 2 * margin)
+        canvas.drawRoundRect(margin, margin, margin + cardWidth, margin + 48 * unit, 8 * unit, 8 * unit, cardBackgroundPaint)
+        val mode = "${state.currentTransportMode.emoji} ${PlaybackOverlayContent.mode(state)}"
+        fitText(text, mode, cardWidth - 16 * unit)
+        canvas.drawText(mode, margin + 8 * unit, margin + 16 * unit, text)
+        text.textSize = 10 * unit; text.color = 0xFF72D6F6.toInt()
+        val distance = PlaybackOverlayContent.distance(state)
+        fitText(text, distance, cardWidth - 16 * unit)
+        canvas.drawText(distance, margin + 8 * unit, margin + 32 * unit, text)
+        val fraction = (state.currentTraveledDistanceMeters / maxOf(1.0, state.totalTripDistanceMeters)).toFloat().coerceIn(0f, 1f)
+        text.color = 0xFF536172.toInt()
+        canvas.drawRect(margin + 8 * unit, margin + 40 * unit, margin + cardWidth - 8 * unit, margin + 42 * unit, text)
+        text.color = 0xFF45CDB5.toInt()
+        canvas.drawRect(margin + 8 * unit, margin + 40 * unit, margin + 8 * unit + (cardWidth - 16 * unit) * fraction, margin + 42 * unit, text)
+        canvas.drawRoundRect(dateLeft, margin, width - margin, margin + 40 * unit, 8 * unit, 8 * unit, cardBackgroundPaint)
+        text.color = Color.WHITE; text.textSize = 11 * unit
+        canvas.drawText(date, dateLeft + 8 * unit, margin + 16 * unit, text)
+        text.color = 0xFFCBD5E1.toInt(); text.textSize = 10 * unit
+        canvas.drawText(PlaybackOverlayContent.day(state, timeline, tripStartDateIso), dateLeft + 8 * unit, margin + 32 * unit, text)
+    }
+
     private fun renderPhotoOverlay(
-        canvas: Canvas,
-        width: Int,
-        height: Int,
-        photo: MediaItem,
-        placeName: String?
+        canvas: Canvas, width: Int, height: Int, photo: MediaItem, placeName: String?
     ) {
-        val cardWidth = width * if (width > height) 0.25f else 0.38f
-        val cardHeight = height * if (width > height) 0.34f else 0.22f
-        val cardLeft = width - cardWidth - (width * 0.04f)
-        val cardTop = height * 0.08f
-        val rect = RectF(cardLeft, cardTop, cardLeft + cardWidth, cardTop + cardHeight)
-
-        // Card shadow & background
-        canvas.drawRoundRect(rect, 20f, 20f, cardBackgroundPaint)
-        canvas.drawRoundRect(rect, 20f, 20f, cardBorderPaint)
-
-        // Load & draw cached bitmap
-        val bitmap = getOrDecodePhotoBitmap(photo, (cardWidth * 1.5f).toInt(), (cardHeight * 1.2f).toInt())
-        if (bitmap != null) {
-            val imgPadding = 8f
-            val imgRect = RectF(
-                rect.left + imgPadding,
-                rect.top + imgPadding,
-                rect.right - imgPadding,
-                rect.bottom - (cardHeight * 0.22f)
-            )
-
-            val path = Path().apply {
-                addRoundRect(imgRect, 14f, 14f, Path.Direction.CW)
-            }
-            canvas.save()
-            canvas.clipPath(path)
-
-            // Center-crop source calculation to prevent photo distortion
-            val targetAspect = imgRect.width() / maxOf(1f, imgRect.height())
-            val bmpAspect = bitmap.width.toFloat() / maxOf(1f, bitmap.height.toFloat())
-            val src = when {
-                bmpAspect > targetAspect -> {
-                    val cropW = (bitmap.height * targetAspect).toInt()
-                    val cropLeft = (bitmap.width - cropW) / 2
-                    Rect(cropLeft, 0, cropLeft + cropW, bitmap.height)
-                }
-                bmpAspect < targetAspect -> {
-                    val cropH = (bitmap.width / targetAspect).toInt()
-                    val cropTop = (bitmap.height - cropH) / 2
-                    Rect(0, cropTop, bitmap.width, cropTop + cropH)
-                }
-                else -> Rect(0, 0, bitmap.width, bitmap.height)
-            }
-
-            val photoPaint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
-            canvas.drawBitmap(bitmap, src, imgRect, photoPaint)
-            canvas.restore()
+        val unit = minOf(width, height) / 360f
+        val maxWidth = minOf(width * .38f, 180 * unit)
+        val maxHeight = minOf(height * .30f, 180 * unit)
+        val bitmap = getOrDecodePhotoBitmap(photo, maxWidth.toInt(), maxHeight.toInt()) ?: return
+        val fitted = PlaybackOverlayContent.fitPhoto(bitmap.width.toFloat(), bitmap.height.toFloat(), maxWidth, maxHeight)
+        val padding = 4 * unit
+        val caption = 20 * unit
+        val cardWidth = fitted.width + padding * 2
+        val cardHeight = fitted.height + padding * 2 + caption
+        val left = width - cardWidth - 8 * unit
+        val top = 64 * unit
+        val rect = RectF(left, top, left + cardWidth, top + cardHeight)
+        canvas.drawRoundRect(rect, 8 * unit, 8 * unit, cardBackgroundPaint)
+        val imgRect = RectF(left + padding, top + padding, left + padding + fitted.width, top + padding + fitted.height)
+        // Full upright bitmap, with an aspect-matched destination. No clipping of photo corners.
+        canvas.drawBitmap(bitmap, null, imgRect, Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG))
+        val label = placeName ?: photo.assignedDayIso ?: "Photo"
+        val text = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.WHITE; textSize = 10 * unit; typeface = Typeface.DEFAULT_BOLD; textAlign = Paint.Align.CENTER
         }
-
-        // Label (Place name or contextual date, NOT raw filename)
-        val label = placeName ?: photo.assignedDayIso ?: "Photo Moment"
-        val textPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = Color.WHITE
-            textSize = cardHeight * 0.10f
-            typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
-            textAlign = Paint.Align.CENTER
-        }
-        val textY = rect.bottom - (cardHeight * 0.07f)
-        fitText(textPaint, label, cardWidth * .9f)
-        canvas.drawText(label, rect.centerX(), textY, textPaint)
+        val displayLabel = android.text.TextUtils.ellipsize(label, android.text.TextPaint(text), fitted.width,
+            android.text.TextUtils.TruncateAt.END).toString()
+        canvas.drawText(displayLabel, rect.centerX(), rect.bottom - 7 * unit, text)
     }
 
     private fun renderTitleCardOverlay(
@@ -264,8 +263,8 @@ class TravelVideoRenderer(
 
         fitText(titlePaint, card.title, cardWidth * .9f)
         canvas.drawText(card.title, rect.centerX(), rect.top + cardHeight * 0.36f, titlePaint)
-        canvas.drawText(card.dateRangeStr, rect.centerX(), rect.top + cardHeight * 0.62f, subtitlePaint)
-        canvas.drawText(card.subtitle, rect.centerX(), rect.top + cardHeight * 0.82f, subtitlePaint)
+        drawFittedText(canvas, card.dateRangeStr, rect.centerX(), rect.top + cardHeight * 0.62f, cardWidth * .9f, subtitlePaint)
+        drawFittedText(canvas, card.subtitle, rect.centerX(), rect.top + cardHeight * 0.82f, cardWidth * .9f, subtitlePaint)
     }
 
     private fun renderEndCardOverlay(
@@ -307,8 +306,8 @@ class TravelVideoRenderer(
 
         fitText(titlePaint, card.title, cardWidth * .9f)
         canvas.drawText(card.title, rect.centerX(), rect.top + cardHeight * 0.28f, titlePaint)
-        canvas.drawText("${card.totalDaysStr} · ${card.totalDistanceStr}", rect.centerX(), rect.top + cardHeight * 0.52f, subtitlePaint)
-        canvas.drawText("${card.memoriesCountStr} · My Travel Diary 3D", rect.centerX(), rect.top + cardHeight * 0.74f, subtitlePaint)
+        drawFittedText(canvas, "${card.totalDaysStr} · ${card.totalDistanceStr}", rect.centerX(), rect.top + cardHeight * 0.52f, cardWidth * .9f, subtitlePaint)
+        drawFittedText(canvas, "${card.memoriesCountStr} · My Travel Diary 3D", rect.centerX(), rect.top + cardHeight * 0.74f, cardWidth * .9f, subtitlePaint)
     }
 
     private fun getOrDecodePhotoBitmap(photo: MediaItem, reqWidth: Int, reqHeight: Int): Bitmap? {

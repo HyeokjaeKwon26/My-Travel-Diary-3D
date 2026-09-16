@@ -1,3 +1,20 @@
+# 1.0.0-rc7 playback overlays and date selection
+
+Date: 2026-09-16. RC7 keeps the existing map source, terrain and camera. It adds compact playback information, a persistent actual date and calendar day number, full-aspect photos in app/video, and safe date-picker confirmation above Android navigation. The floating map options card is removed; settings move to the diary toolbar. Pausing/scrubbing at zero retains playback overlays until the user explicitly exits playback. Video title/end subtitles are fitted inside their cards.
+
+Dates use saved episode timezone metadata and the saved trip start date. Movement keeps departure timezone until arrival and then uses the destination timezone; unknown zones are marked UTC. No per-frame geographic timezone lookup is added. No route prefetch, provider migration or GitHub map pack is included.
+
+## RC7 verification
+
+- 318 JVM checks passed, including local midnight, backward seek, title/end dates, phone-timezone independence, flight arrival across date boundaries, explicit unknown-timezone fallback and aspect fitting for portrait/landscape/panoramas.
+- Android overlay checks cover a 150% font scale, non-overlapping date/info/photo bounds and the actual rendered pixels of all four photo borders. Video overlays preserve all four source edges in both 720×1280 and 1280×720 outputs.
+- Date confirmation passed in gesture and three-button navigation at 1080×2400 / 420 dpi, and at tablet size 2560×1600 / 240 dpi. Confirmation is both above navigation and clickable.
+- Existing 3D integration checks passed, including access to the relocated settings, normal demo rendering/export and stored geometry. Landscape export/player and photo-analysis integration passed. Portrait and landscape MP4s decoded completely with FFmpeg.
+- Initial UI checks found that inherited Material line height made the small header too tall at 150% font scale, and Compose dialog insets alone left confirmation near system navigation. Explicit line heights and a union with host-window system insets fixed these failures. A screenshot initially captured before Coil's display frame; the final test waits for actual photo border pixels, not just updated layout bounds.
+- Physical Galaxy S23 Ultra testing remains unavailable. Emulator checks are not a hardware frame-rate or thermal guarantee. The previously reported video map gaps have no supplied MP4 reproduction; this release does not claim to fix an unverified map-renderer defect.
+
+---
+
 # 1.0.0-rc6 implementation and acceptance status
 
 Date: 2026-09-16 (local). Target phone: Galaxy S23 Ultra. The user could not connect the phone during this session. This release candidate can be installed and used, but it is not a declaration that every criterion in the production readiness plan has passed.

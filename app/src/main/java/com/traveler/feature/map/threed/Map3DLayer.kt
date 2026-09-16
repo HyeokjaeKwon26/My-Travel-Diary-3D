@@ -23,6 +23,7 @@ import kotlinx.coroutines.*
 
 @Composable
 fun Map3DLayer(model:TravelMapRenderModel,timeline:TravelStoryTimeline,state:TravelPlaybackState?, playing:Boolean=false,
+               showOptions:Boolean=false, onDismissOptions:()->Unit={},
                fallback:@Composable ()->Unit) {
     val context=LocalContext.current
     val scope=rememberCoroutineScope()
@@ -34,7 +35,6 @@ fun Map3DLayer(model:TravelMapRenderModel,timeline:TravelStoryTimeline,state:Tra
     var internetMaps by remember { mutableStateOf(preferences.getBoolean("internetMaps",true)) }
     var mapStatus by remember { mutableStateOf("Reference map · loading street detail") }
     val uriHandler=androidx.compose.ui.platform.LocalUriHandler.current
-    var options by remember { mutableStateOf(false) }
     var credits by remember { mutableStateOf(false) }
     var message by remember { mutableStateOf<String?>(null) }
     var packs by remember { mutableStateOf<List<TerrainPack>>(emptyList()) }
@@ -96,12 +96,8 @@ fun Map3DLayer(model:TravelMapRenderModel,timeline:TravelStoryTimeline,state:Tra
             Text("N ↑ · © OpenStreetMap contributors · Natural Earth",color=Color.White,fontSize=9.sp,lineHeight=11.sp,
                 modifier=Modifier.clickable { uriHandler.openUri("https://www.openstreetmap.org/copyright") }.padding(vertical=2.dp))
         }
-        TextButton(onClick={options=true},modifier=Modifier.align(Alignment.TopEnd).padding(4.dp)
-            .background(Color(0xDD102638),RoundedCornerShape(12.dp))) {
-            Text(if(use3D) "3D • Terrain" else "2D • Options",color=Color.White,fontSize=11.sp)
-        }
     }
-    if(options) AlertDialog(onDismissRequest={options=false},title={Text("3D map & terrain")},text={
+    if(showOptions) AlertDialog(onDismissRequest=onDismissOptions,title={Text("3D map & terrain")},text={
         Column(Modifier.heightIn(max=480.dp).verticalScroll(rememberScrollState()),verticalArrangement=Arrangement.spacedBy(8.dp)) {
             Text(terrainStatus.message)
             Text("Terrain is prepared automatically on Wi-Fi. Saved terrain works offline. Your Timeline and photos stay on this phone.",fontSize=12.sp)
@@ -137,7 +133,7 @@ fun Map3DLayer(model:TravelMapRenderModel,timeline:TravelStoryTimeline,state:Tra
             TextButton(onClick={uriHandler.openUri("https://www.openstreetmap.org/fixthemap")}) { Text("Report a map issue") }
             message?.let { Text(it,fontSize=11.sp) }
         }
-    },confirmButton={TextButton(onClick={options=false}) { Text("Done") }})
+    },confirmButton={TextButton(onClick=onDismissOptions) { Text("Done") }})
     if(credits) {
         val text by produceState("") { value=withContext(Dispatchers.IO) { context.assets.open("terrain_attribution.md").bufferedReader().use { it.readText() } } }
         AlertDialog(onDismissRequest={credits=false},title={Text("Terrain credits")},
