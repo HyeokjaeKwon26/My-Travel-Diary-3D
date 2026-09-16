@@ -2,7 +2,7 @@
 
 An independent Android 3D edition of [My Travel Diary](https://github.com/HyeokjaeKwon26/My-Travel-Diary), based on original commit `9bcfb4f`.
 
-**Version: 1.0.0-rc6.** Non-blocking background map preparation, bounded 2D drawing, automatic north-up route framing, adaptive phone/tablet layouts, calendar dates, local visual photo selection, and portrait/landscape video creation and playback. Physical-device acceptance is pending; Galaxy S23 Ultra is the primary target. See [validation and remaining work](docs/PRODUCTION_STATUS.md).
+**Version: 1.0.0-rc7.** Non-blocking background map preparation, bounded 2D drawing, automatic north-up route framing, adaptive phone/tablet layouts, calendar dates, local visual photo selection, and portrait/landscape video creation and playback. Physical-device acceptance is pending; Galaxy S23 Ultra is the primary target. See [validation and remaining work](docs/PRODUCTION_STATUS.md).
 
 ## 한국어
 
@@ -14,6 +14,11 @@ Google Timeline JSON과 휴대폰 사진을 여행 다이어리로 구성하고,
 - Android 8.0 이상을 대상으로 빌드합니다. 실제 지원 성능은 기기 검증이 더 필요합니다.
 
 ### 이번 버전
+
+- 재생 정보 창을 작은 이동수단·거리 표시와 얇은 진행 막대로 줄였습니다. 실제 날짜와 여행 일차를 재생·일시정지·탐색 중 계속 표시합니다.
+- 지도 위의 `3D • Terrain` / `2D • Options` 카드를 제거했습니다. 기존 지도 설정과 2D 전환은 여행 제목 옆 설정 버튼에서 열 수 있습니다.
+- 앱과 영상에서 사진을 자르지 않고 원본 비율대로 축소합니다. 세로·가로·파노라마 사진의 전체 구도를 유지합니다.
+- 날짜 선택창의 확인 버튼이 제스처·3버튼 내비게이션에 겹치지 않도록 시스템 영역을 확보했습니다.
 
 - 북쪽을 위로 고정하고 경로 길이·화면 비율에 맞춰 자동 배율을 계산합니다. 수동 배율·핀치 줌은 사용하지 않습니다. 캐릭터를 줄이고 경로 선의 화면상 굵기를 유지합니다.
 - 긴 구간은 더 천천히, 더 넓게 보여주며 시작·끝에는 전체 경로를 보여줍니다. 화면과 영상이 같은 카메라 계산을 사용합니다.

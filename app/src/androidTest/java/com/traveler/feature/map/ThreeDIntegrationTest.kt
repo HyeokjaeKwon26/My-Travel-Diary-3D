@@ -48,8 +48,8 @@ class ThreeDIntegrationTest {
     @Test fun demoCanBeOpenedThroughNormalAppAndTerrainOptions() {
         compose.onNodeWithText("New Travel Story",useUnmergedTree=true).performClick()
         compose.onNodeWithText("Try Grand Canyon 3D • illustrative route").performScrollTo().performClick()
-        compose.waitUntil(30_000) { compose.onAllNodesWithText("3D • Terrain").fetchSemanticsNodes().isNotEmpty() }
-        compose.onNodeWithText("3D • Terrain").performClick()
+        compose.waitUntil(30_000) { compose.onAllNodesWithContentDescription("Map settings").fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithContentDescription("Map settings").performClick()
         compose.onNodeWithText("3D map & terrain").assertIsDisplayed()
         compose.onNodeWithText("Done").performClick()
         compose.onNodeWithContentDescription("Start Playback").assertExists()

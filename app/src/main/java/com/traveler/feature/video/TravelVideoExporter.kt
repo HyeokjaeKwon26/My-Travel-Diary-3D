@@ -105,7 +105,8 @@ object TravelVideoExporter {
             timeline = timeline,
             generalizeHomeAddress = generalizeHomeAddress,
             sceneGeometry = com.traveler.feature.map.threed.SceneGeometry(safeModel, timeline, terrain),
-            streetCacheDirectory = frozenMaps
+            streetCacheDirectory = frozenMaps,
+            tripStartDateIso = trip.startDateIso
         )
         val tempDir = getExportTempDir(context)
         val sanitizedTitle = trip.title.replace(Regex("[^a-zA-Z0-9_-]"), "_")
