@@ -45,7 +45,17 @@ class TripRepositoryImpl(
                     totalMediaCount = entity.totalMediaCount,
                     createdAtEpochMs = entity.createdAtEpochMs,
                     visitSummary = TripVisitSummary.from(tripRows.mapNotNull { row ->
-                        row.summaryVisitId?.let { TripVisitLabel(it, row.summaryPlaceName) }
+                        row.summaryVisitId?.let { id -> TripVisitLabel(
+                            id, row.summaryPlaceName,
+                            location = if (row.summaryLatitude != null && row.summaryLongitude != null &&
+                                row.summaryLatitude in -90.0..90.0 && row.summaryLongitude in -180.0..180.0)
+                                GeoPoint(row.summaryLatitude, row.summaryLongitude) else null,
+                            isUserOverride = row.summaryUserOverride,
+                            startEpochMs = row.summaryStart,
+                            durationMs = ((row.summaryEnd ?: 0).toDouble() - (row.summaryStart ?: 0).toDouble())
+                                .coerceIn(0.0, 86_400_000.0).toLong(),
+                            timezoneId = row.summaryTimezone, photoCount = row.summaryPhotoCount
+                        ) }
                     })
                 )
             }
@@ -150,6 +160,7 @@ class TripRepositoryImpl(
 
         // Reconstruct TripDays using persisted timezones without blocking on TimeShape
         val days = reconstructDays(visits, segments, confidentMediaItems, tripEntity.startDateIso, tripEntity.endDateIso)
+        val visitPhotoCounts = mediaItems.mapNotNull { it.matchedVisitId }.groupingBy { it }.eachCount()
 
         Trip(
             id = tripEntity.id,
@@ -165,7 +176,8 @@ class TripRepositoryImpl(
             createdAtEpochMs = tripEntity.createdAtEpochMs,
             visitSummary = TripVisitSummary.from(visits.sortedWith(
                 compareBy<Visit> { it.startTimestampEpochMs }.thenBy { it.id }
-            ).map { TripVisitLabel(it.id, it.placeName) })
+            ).map { TripVisitLabel(it.id, it.placeName, it.location, it.isUserOverride,
+                it.startTimestampEpochMs, it.durationMillis, it.timezoneId, visitPhotoCounts[it.id] ?: 0) })
         )
     }
 
