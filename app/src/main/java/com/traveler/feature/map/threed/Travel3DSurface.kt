@@ -14,10 +14,12 @@ import javax.microedition.khronos.opengles.GL10
 
 @Composable
 fun Travel3DSurface(scene: SceneGeometry, state: TravelPlaybackState?, calm: Boolean, modifier: Modifier,
+                    mapScale:Double=1.0, internetMaps:Boolean=true,onMapStatus:(String)->Unit={},
                     onError: (String) -> Unit) {
     val context=LocalContext.current
     val lifecycle=LocalLifecycleOwner.current.lifecycle
     val errorCallback by rememberUpdatedState(onError)
+    val mapStatusCallback by rememberUpdatedState(onMapStatus)
     val bridge=remember(scene) { SceneBridge(context,scene) { message -> errorCallback(message) } }
     val surface=remember(scene) {
         GLSurfaceView(context).apply {
@@ -34,19 +36,28 @@ fun Travel3DSurface(scene: SceneGeometry, state: TravelPlaybackState?, calm: Boo
             } }
         }
     }
+    SideEffect {
+        bridge.mapChanged={
+            mapStatusCallback(bridge.streetStatus())
+            surface.requestRender()
+            surface.removeCallbacks(bridge.refresh)
+            surface.postDelayed(bridge.refresh,800)
+        }
+        bridge.refreshAction={surface.requestRender()}
+    }
     DisposableEffect(surface,lifecycle) {
         val observer=LifecycleEventObserver { _,event ->
-            if(event==Lifecycle.Event.ON_RESUME) { surface.onResume();surface.requestRender() }
-            if(event==Lifecycle.Event.ON_PAUSE) surface.onPause()
+            if(event==Lifecycle.Event.ON_RESUME) { bridge.resumed=true;bridge.updateNetwork();surface.onResume();surface.requestRender() }
+            if(event==Lifecycle.Event.ON_PAUSE) { bridge.resumed=false;bridge.updateNetwork();surface.onPause() }
         }
         lifecycle.addObserver(observer)
-        onDispose { lifecycle.removeObserver(observer);surface.queueEvent { bridge.release() };surface.onPause() }
+        onDispose { lifecycle.removeObserver(observer);bridge.stopNetwork();surface.removeCallbacks(bridge.refresh);surface.queueEvent { bridge.release() };surface.onPause() }
     }
     val frameRequest=remember(surface) { FrameRequest(surface) }
     DisposableEffect(frameRequest) { onDispose { frameRequest.cancel() } }
     key(surface) {
         AndroidView(factory={surface},modifier=modifier,update={
-            bridge.state=state;bridge.calm=calm
+            bridge.state=state;bridge.calm=calm;bridge.mapScale=mapScale;bridge.internetMaps=internetMaps;bridge.updateNetwork()
             frameRequest.request()
         })
     }
@@ -54,7 +65,17 @@ fun Travel3DSurface(scene: SceneGeometry, state: TravelPlaybackState?, calm: Boo
 
 private class SceneBridge(val context: android.content.Context,val scene: SceneGeometry,val onError:(String)->Unit): GLSurfaceView.Renderer {
     @Volatile var state:TravelPlaybackState?=null
-    @Volatile var calm=false
+    @Volatile var calm=true
+    @Volatile var mapScale=1.0
+    @Volatile var internetMaps=true
+    @Volatile var resumed=true
+    @Volatile private var streets:StreetMapSession?=null
+    var mapChanged:()->Unit={}
+    var refreshAction:()->Unit={}
+    val refresh=Runnable { refreshAction() }
+    fun streetStatus()=streets?.status ?: "Reference map · loading street detail"
+    fun updateNetwork() { streets?.setActive(internetMaps && resumed) }
+    fun stopNetwork() { streets?.close() }
     val quality=RenderQuality((context.getSystemService(android.content.Context.ACTIVITY_SERVICE) as android.app.ActivityManager).isLowRamDevice)
     var onQuality:(Float)->Unit={}
     private val power=context.getSystemService(android.content.Context.POWER_SERVICE) as android.os.PowerManager
@@ -62,14 +83,19 @@ private class SceneBridge(val context: android.content.Context,val scene: SceneG
     private var renderer:TravelGlRenderer?=null
     private val main=android.os.Handler(android.os.Looper.getMainLooper())
     override fun onSurfaceCreated(gl:GL10?,config:EGLConfig?) {
-        try { renderer=TravelGlRenderer(context,scene).also { it.initialize() } }
+        try {
+            streets?.close()
+            val session=StreetMapSession(context,network=true) { main.post { mapChanged() } }
+            streets=session;updateNetwork()
+            renderer=TravelGlRenderer(context,scene,session).also { it.initialize() }
+        }
         catch(e:Exception) { main.post { onError(e.message ?: "3D unavailable on this device") } }
     }
     override fun onSurfaceChanged(gl:GL10?,w:Int,h:Int) { width=w;height=h }
     override fun onDrawFrame(gl:GL10?) {
         try {
             val started=System.nanoTime()
-            renderer?.render(width,height,state,calm)
+            renderer?.render(width,height,state,calm,mapScale)
             val thermal=android.os.Build.VERSION.SDK_INT>=29 && power.currentThermalStatus>=android.os.PowerManager.THERMAL_STATUS_MODERATE
             if(quality.observe((System.nanoTime()-started)/1_000_000.0,thermal)) onQuality(quality.scale)
         }

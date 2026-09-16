@@ -1,6 +1,25 @@
-# 1.0.0-rc3 implementation and acceptance status
+# 1.0.0-rc4 implementation and acceptance status
 
-Date: 2026-09-15 (local). Target phone: Galaxy S23 Ultra. The user could not connect the phone during this session. This release candidate can be installed and used, but it is not a declaration that every criterion in the production readiness plan has passed.
+Date: 2026-09-16 (local). Target phone: Galaxy S23 Ultra. The user could not connect the phone during this session. This release candidate can be installed and used, but it is not a declaration that every criterion in the production readiness plan has passed.
+
+## RC4 north-up camera and street detail
+
+RC3's heading-following camera rotated the entire map, and Natural Earth alone could not identify local roads or neighborhoods. RC4 fixes north at the top and follows only the current location. Vehicles independently face their route tangent. Ground camera distance no longer inherits the timeline arrival zoom; Close / Local / Area / Region scale choices persist and also apply to exports. Flight scale remains wider to show the aerial journey.
+
+OpenStreetMap street PNGs are draped onto the existing terrain atlas. Requests cover only the current interactive screen; there is no route prefetch, headless download or offline pack. One worker per scene uses a stable app User-Agent, HTTP expiry/validators, timeouts, bounded responses, rate-limit backoff and a 96 MiB disk cache. Closing/backgrounding the scene or disabling internet maps stops network requests. The render atlas remains 2048×2048; the tile bitmap cache has at most 48 entries. Internet maps can use mobile data and can be disabled in the terrain dialog. The bundled regional map remains the fallback.
+
+Exports read already cached tiles only and never initiate street-map downloads. Previously unseen areas in a video may therefore use the simpler regional map. On-map and exported attribution credits OpenStreetMap contributors and Natural Earth. More detailed cartography does not alter recorded GPS positions, snap routes to roads, or improve uncertain GPS/DEM measurements. The illustrative Canyon path is still not road matched.
+
+### RC4 verification
+
+- 302 JVM tests passed. Debug and optimized release builds passed. Lint: 0 errors, 86 warnings and 6 informational findings (the added warning suggests using the SharedPreferences KTX helper).
+- Production APK: 43,817,765 bytes; SHA-256 `d93554a12fe9563604006eada1ec8f1c4faf8da11881a326d848cbf39ec8af46`. Version code 5, same production certificate as RC1/RC2/RC3. Packaged JNI/resource/map contracts passed.
+- Automated map tests use local synthetic tile fixtures or a fake HTTP connection; they do not download from the public tile service. A manual app viewport confirmed that actual OSM roads and place names render over the Canyon terrain.
+- The first full-screen smoke test used a regional-view color-count threshold that rejected the new closer rural view. Its saved image showed rendered terrain and the toy car. The check now requires terrain color variation plus red/yellow toy pixels instead of an arbitrary large palette; obscuring system dialogs still fail the test.
+- All nine Android checks passed: three street-map/cache checks, two reference-cartography checks, three app/persistence/video checks, and 33 vehicle poses within the all-mode check. Heading reversal and the old arrival zoom leave map pixels unchanged outside the vehicle. The final generated MP4 decoded completely with FFmpeg.
+- Installed production-signed RC4 over RC3 without uninstalling in the same emulator session. The saved 31.2 km Canyon journey survived force-stop/restart before the update, stayed in the home list after the update, reopened with visits/movement, and displayed live street detail. The installed package reported version code 5 / 1.0.0-rc4.
+- Subsequent small changes collapse the loaded-map credit/status to one line and record the tile revision before texture composition, so a tile arriving during upload is not accidentally marked as already painted. Functional tests above precede these two finishing changes; the final signed APK was reinstalled, reopened the retained journey after emulator restart, and showed a complete street map while paused with the compact credit. [Final signed screenshot](verification-3d/rc4-signed-street.png).
+- As with RC3, an external System UI non-response dialog appeared at emulator cold boot and was dismissed before tests. The clean final tests passed; no S23 Ultra hardware/thermal benchmark is claimed.
 
 ## RC3 playful vehicles and flight correction
 
@@ -61,7 +80,7 @@ Map data uses a preprojected binary cache and one 2048×2048 local texture (16 M
 - The actual user-reported two-line route case has not been supplied. Synthetic duplicate/return/continuity tests and shared route rendering do not prove that particular case is fixed.
 - Existing timeline canonicalization and diagnostics remain in place. A comprehensive new per-point horizontal GPS-error classifier and user-facing elevation/bridge/tunnel editing are not implemented.
 - Terrain LOD is chosen per journey, not continuously refined coarse-to-fine. Raw height grids for up to 256 regions are retained on the CPU; only nearby meshes are built. Strict view-frustum culling and asynchronous mesh upload remain optimization work.
-- The 3D vehicle/camera heading follows a sampled route tangent. Further camera transition work for extreme gaps and mode switches remains; rewind is deterministic but is not universally cinematic.
+- Vehicle headings follow a sampled route tangent; the camera is north-up. Camera scale/position transitions for extreme gaps and switches between ground and flight remain potential improvements; rewind is deterministic but is not universally cinematic.
 - No road matching, detailed buildings, measured bridge deck/tunnel altitude, global terrain package, provider uptime guarantee, or photo migration across phones is claimed.
 - Full power-loss/storage-exhaustion/permission-revocation/background stress across supported Android releases remains acceptance work. Backup does not include image files, permission grants, terrain or original import files.
 

@@ -3,6 +3,7 @@ package com.traveler.feature.map.threed
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.*
@@ -27,7 +28,11 @@ fun Map3DLayer(model:TravelMapRenderModel,timeline:TravelStoryTimeline,state:Tra
     val scope=rememberCoroutineScope()
     var use3D by remember { mutableStateOf(true) }
     val preferences = remember { context.getSharedPreferences("scene_preferences", 0) }
-    var calm by remember { mutableStateOf(preferences.getBoolean("calm", false)) }
+    val calm=true // RC4 intentionally ignores the older orbit/follow-heading preference.
+    var mapScale by remember { mutableStateOf(preferences.getFloat("mapScale",1f).toDouble()) }
+    var internetMaps by remember { mutableStateOf(preferences.getBoolean("internetMaps",true)) }
+    var mapStatus by remember { mutableStateOf("Reference map · loading street detail") }
+    val uriHandler=androidx.compose.ui.platform.LocalUriHandler.current
     var options by remember { mutableStateOf(false) }
     var credits by remember { mutableStateOf(false) }
     var message by remember { mutableStateOf<String?>(null) }
@@ -71,17 +76,19 @@ fun Map3DLayer(model:TravelMapRenderModel,timeline:TravelStoryTimeline,state:Tra
     }
     Box(Modifier.fillMaxSize()) {
         if(use3D) {
-            if(scene!=null) Travel3DSurface(scene!!,state,calm,Modifier.fillMaxSize()) {
+            if(scene!=null) Travel3DSurface(scene!!,state,calm,Modifier.fillMaxSize(),mapScale,internetMaps,{mapStatus=it}) {
                 message=it;use3D=false
             } else CircularProgressIndicator(Modifier.align(Alignment.Center))
         } else fallback()
         if (scene?.uncertain(state) == true) Text("Elevation uncertain • vehicle hidden",
             color=Color.White, fontSize=12.sp, modifier=Modifier.align(Alignment.Center)
                 .background(Color(0xDD102638),RoundedCornerShape(8.dp)).padding(8.dp))
-        if(terrainStatus.ready<terrainStatus.total || plan?.limited==true) Text(
-            terrainStatus.message,color=Color.White,fontSize=10.sp,
-            modifier=Modifier.align(Alignment.BottomStart).padding(start=8.dp,bottom=62.dp)
-                .background(Color(0xCC102638),RoundedCornerShape(6.dp)).padding(5.dp))
+        if(use3D) Column(Modifier.align(Alignment.BottomStart).padding(start=6.dp,bottom=68.dp)
+            .background(Color(0xDD102638),RoundedCornerShape(6.dp)).padding(horizontal=6.dp,vertical=3.dp)) {
+            if(!mapStatus.startsWith("Street map")) Text(mapStatus,color=Color.White,fontSize=9.sp,lineHeight=11.sp)
+            Text("N ↑ · © OpenStreetMap contributors · Natural Earth",color=Color.White,fontSize=9.sp,lineHeight=11.sp,
+                modifier=Modifier.clickable { uriHandler.openUri("https://www.openstreetmap.org/copyright") }.padding(vertical=2.dp))
+        }
         TextButton(onClick={options=true},modifier=Modifier.align(Alignment.TopEnd).padding(4.dp)
             .background(Color(0xDD102638),RoundedCornerShape(12.dp))) {
             Text(if(use3D) "3D • Terrain" else "2D • Options",color=Color.White,fontSize=11.sp)
@@ -107,13 +114,25 @@ fun Map3DLayer(model:TravelMapRenderModel,timeline:TravelStoryTimeline,state:Tra
             Row { listOf(100,200,500).forEach { mb -> TextButton(onClick={action { JourneyTerrain.setBudget(context,mb);limitMb=mb }}) { Text("$mb MB") } } }
             TextButton(onClick={action { plan?.let { JourneyTerrain.pause(context,it.key) };JourneyTerrain.clearTemporary(context);plan?.let { packs=JourneyTerrain.load(context,it.key) } }}) { Text("Clear temporary terrain") }
             TextButton(onClick={use3D=!use3D}) { Text(if(use3D) "Switch to 2D map" else "Switch to 3D map") }
-            TextButton(onClick={calm=!calm;preferences.edit().putBoolean("calm",calm).apply()}) { Text(if(calm) "Camera: steady north" else "Camera: follow journey") }
+            Text("Camera: north up. The map follows your location without rotating or arrival zooms.",fontSize=12.sp)
+            Text("Map scale",fontSize=13.sp)
+            Row { listOf("Close" to .5,"Local" to 1.0,"Area" to 2.5,"Region" to 6.0).forEach { (label,factor) ->
+                TextButton(onClick={mapScale=factor;preferences.edit().putFloat("mapScale",factor.toFloat()).apply()}) {
+                    Text(if(mapScale==factor)"• $label" else label)
+                }
+            } }
+            Row(verticalAlignment=Alignment.CenterVertically) {
+                Text("Internet street detail",Modifier.weight(1f),fontSize=13.sp)
+                Switch(checked=internetMaps,onCheckedChange={internetMaps=it;preferences.edit().putBoolean("internetMaps",it).apply()})
+            }
+            Text("Roads and place names load for the visible screen only, using Wi-Fi or mobile data. Viewed tiles are cached (up to 96 MB). Unseen offline areas use the reference map. Video uses cached detail without downloading new map areas.",fontSize=11.sp)
             TextButton(onClick={picker.launch(arrayOf("application/json","application/octet-stream"))}) { Text("Advanced: import terrain file") }
             TextButton(onClick={action { TerrainRepository.clearImported(context);packs=plan?.let { JourneyTerrain.load(context,it.key) } ?: TerrainRepository.load(context) }}) { Text("Remove imported terrain packs") }
             Text("Terrain: Mapzen / USGS and regional contributors. Tile requests reveal the requested area and IP to the provider; photos and Timeline files are never uploaded.",fontSize=11.sp)
             TextButton(onClick={credits=true}) { Text("Terrain data sources & credits") }
             Text("Outside stored regions the globe has no detailed relief. Terrain height is estimated, not measured vehicle altitude.",fontSize=11.sp)
-            Text("Offline map: Natural Earth. Regional roads, rivers and place names are included; this is not a street-level navigation map.",fontSize=11.sp)
+            Text("Street map: © OpenStreetMap contributors. Reference map: Natural Earth. Map requests reveal the visible area and your IP to OpenStreetMap; Timeline files and photos stay local.",fontSize=11.sp)
+            TextButton(onClick={uriHandler.openUri("https://www.openstreetmap.org/fixthemap")}) { Text("Report a map issue") }
             message?.let { Text(it,fontSize=11.sp) }
         }
     },confirmButton={TextButton(onClick={options=false}) { Text("Done") }})

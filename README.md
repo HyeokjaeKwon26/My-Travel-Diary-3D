@@ -2,7 +2,7 @@
 
 An independent Android 3D edition of [My Travel Diary](https://github.com/HyeokjaeKwon26/My-Travel-Diary), based on original commit `9bcfb4f`.
 
-**Version: 1.0.0-rc3.** Larger animated toy vehicles, corrected globe-following flights, offline cartography over 3D terrain, and signed installation builds. Physical-device acceptance is pending; Galaxy S23 Ultra is the primary target. See [validation and remaining work](docs/PRODUCTION_STATUS.md).
+**Version: 1.0.0-rc4.** North-up location following, visible-area street maps over 3D terrain, large animated toy vehicles, and signed installation builds. Physical-device acceptance is pending; Galaxy S23 Ultra is the primary target. See [validation and remaining work](docs/PRODUCTION_STATUS.md).
 
 ## 한국어
 
@@ -15,13 +15,17 @@ Google Timeline JSON과 휴대폰 사진을 여행 다이어리로 구성하고,
 
 ### 이번 버전
 
+- 지도를 항상 북쪽 위로 고정하고 현재 이동 위치만 따라갑니다. 지상 구간의 자동 도착 줌을 없애고 Close / Local / Area / Region 배율을 추가했습니다.
+- 현재 화면의 OpenStreetMap 도로·지명을 3D 지형에 표시합니다. 처음 보는 지역은 인터넷이 필요하며 Wi-Fi/모바일 데이터 사용을 지도 옵션에서 끌 수 있습니다.
+- 상세 지도 캐시는 최대 96 MiB입니다. 지형 캐시와 별도이며, 경로 전체를 미리 다운로드하거나 오프라인 지도 팩을 만들지 않습니다. 영상은 이미 불러온 지도만 재사용하며 없는 부분은 기본 지도로 표시합니다.
+
 - 자동차·버스·기차·지하철·비행기·배·자전거·걷기·달리기를 크게 과장한 입체 장난감으로 표시합니다.
 - 오르막/내리막의 기울기, 통통 튀는 차체, 회전하는 바퀴, 걷기/달리기/페달 동작과 비행기·배의 흔들림을 추가했습니다.
 - 긴 비행이 지구 안으로 들어가던 계산을 수정하고, 북쪽 고정 카메라에서도 기체는 경로 진행 방향을 향합니다.
 - 과장된 움직임은 화면과 저장 영상의 연출에만 적용되며 원래 위치·고도 기록은 변경하지 않습니다.
 
 - 갈색 지형이 지도를 가리던 문제 수정: 지형 위에 해안선·강·주요 도로·도시 영역·지명을 표시. 지도 좌우 반전도 수정.
-- 기본 지도는 APK에 포함되어 고도 다운로드 전이나 오프라인에서도 표시됩니다. 모든 골목길을 포함한 내비게이션 지도는 아닙니다.
+- 기본 지역 지도는 APK에 포함되어 고도 다운로드 전이나 오프라인에서도 표시됩니다. 상세 도로·지명은 인터넷으로 보완합니다. GPS 경로를 도로에 맞추는 내비게이션/도로 매칭 기능은 아닙니다.
 - OpenGL ES 2.0 지구본, 지역 지형, 이동수단별 입체 모델과 추적 카메라.
 - 실제 공개 고도 데이터로 만든 **Grand Canyon South Rim** 오프라인 지형 팩.
 - 지상 이동 경로 주변 지형 자동 다운로드, 일시정지·재개, 모바일 데이터 선택.
@@ -53,14 +57,18 @@ Google Timeline JSON과 휴대폰 사진을 여행 다이어리로 구성하고,
 - DEM은 지면 높이입니다. 다리·터널·절벽 가장자리의 GPS 오차를 정확한 도로 높이로 복원하지 않습니다.
 - 일반 스마트폰의 30fps, 발열, 10분 지속 재생은 아직 실기기 검증 전입니다.
 - 사용자가 보고한 두 줄 현상은 실제 자료를 받지 않아 해당 사례의 해결 여부를 확정하지 않았습니다.
-- 전 세계 도로 매칭, 다리·터널 고도 편집, 구간 전환 카메라의 추가 개선은 남아 있습니다.
+- 전 세계 도로 매칭, 다리·터널 고도 편집, 이동수단 전환 카메라의 추가 개선은 남아 있습니다.
 - 주소 일반화는 장소 이름에 대한 보수적인 필터입니다. 사진 속 주소나 지도 경로를 익명화하지 않습니다.
 
 상세한 구현 범위와 검증 기록: [구현 상태](docs/IMPLEMENTATION_STATUS.md) · [개발 계획](docs/3D_TRAVEL_ROADMAP.md) · [지형 팩 형식](docs/TERRAIN_PACKS.md).
 
 ## Preview
 
-Actual GLES frames: large toy vehicles following a flight and synthetic uphill/downhill routes, plus mapped terrain in the signed app.
+RC4 signed app with north-up street detail (Canyon example route is illustrative, not road matched):
+
+<img src="docs/verification-3d/rc4-signed-street.png" width="320" alt="North-up street map with South Entrance Road and a large animated car" />
+
+Earlier GLES frames: large toy vehicles following a flight and synthetic uphill/downhill routes, plus mapped terrain in the signed app.
 
 <img src="docs/verification-3d/rc3-airplane.png" width="480" alt="Solid aircraft facing its westbound continental route" />
 <img src="docs/verification-3d/rc3-car-climb.png" width="320" alt="Toy car pitching up on a climb" />
@@ -84,6 +92,6 @@ The instrumentation suite checks an actual GLES frame, exports and decodes an MP
 
 ## Data and license
 
-AGPL-3.0; original attribution/history retained. Natural Earth provides the public-domain world polygons. The bundled US terrain is derived from Mapzen Terrain Tiles / USGS sources; see [terrain attribution and source manifests](docs/TERRAIN_PACKS.md). The app fetches public elevation tiles from AWS; tile regions and IP addresses are visible to that provider. Timeline JSON and photos are not uploaded. Source credits are bundled and readable offline from the terrain dialog. See [privacy](docs/PRIVACY_3D.md).
+AGPL-3.0; original attribution/history retained. Natural Earth provides the public-domain world polygons. The bundled US terrain is derived from Mapzen Terrain Tiles / USGS sources; see [terrain attribution and source manifests](docs/TERRAIN_PACKS.md). Street cartography is © [OpenStreetMap contributors](https://www.openstreetmap.org/copyright), fetched only for the interactive viewport under the [tile usage policy](https://operations.osmfoundation.org/policies/tiles/). The app fetches public elevation tiles from AWS and street tiles from OpenStreetMap; requested tile regions and IP addresses are visible to the respective provider. Timeline JSON and photos are not uploaded. Source credits are bundled and readable offline from the terrain dialog. See [privacy](docs/PRIVACY_3D.md).
 
 Historical documents and screenshots inherited from the original project describe the original 2D edition; they are not evidence of this edition’s features or performance.
