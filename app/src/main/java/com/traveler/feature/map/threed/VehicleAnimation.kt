@@ -25,10 +25,10 @@ object VehicleAnimation {
     }
 
     fun scale(distance:Double,width:Int,height:Int,mode:TransportMode):Double {
-        val pixels=(min(width,height)*.16).coerceIn(36.0,132.0)
+        val pixels=(min(width,height)*.16).coerceIn(36.0,132.0) * if(mode==TransportMode.TRAIN) 1.2 else 1.0
         val extent=when(mode) { TransportMode.WALK,TransportMode.RUN,TransportMode.UNKNOWN->2.0
             TransportMode.AIRPLANE->5.4;TransportMode.FERRY->4.2
-            TransportMode.TRAIN,TransportMode.SUBWAY,TransportMode.BUS->4.0;else->3.2 }
+            TransportMode.TRAIN->6.6;TransportMode.SUBWAY,TransportMode.BUS->4.0;else->3.2 }
         return distance*sqrt(1.13)*2*tan(Math.toRadians(21.0))*pixels/max(1,height)/extent
     }
 }

@@ -50,7 +50,7 @@ object TravelVideoExporter {
         renderModel: TravelMapRenderModel,
         profile: StoryDurationProfile
     ): TravelStoryTimeline {
-        val totalDays = trip.days.size
+        val totalDays = runCatching { java.time.temporal.ChronoUnit.DAYS.between(LocalDate.parse(trip.startDateIso), LocalDate.parse(trip.endDateIso)).toInt() + 1 }.getOrDefault(trip.days.size).coerceAtLeast(1)
         val totalDistanceKm = String.format(java.util.Locale.US, "%.1f km", trip.totalDistanceMeters / 1000.0)
         val memoriesCount = "${trip.totalMediaCount} Memories"
 
@@ -63,7 +63,7 @@ object TravelVideoExporter {
 
         val endCard = StoryEndCard(
             title = trip.title,
-            totalDaysStr = "$totalDays Days",
+            totalDaysStr = "$totalDays ${if (totalDays == 1) "Day" else "Days"}",
             totalDistanceStr = totalDistanceKm,
             memoriesCountStr = memoriesCount,
             durationSeconds = 2.5f
@@ -92,7 +92,7 @@ object TravelVideoExporter {
         onProgress: ((Float) -> Unit)? = null
     ): File? = withContext(Dispatchers.IO) {
         val safeModel = if (generalizeHomeAddress) com.traveler.feature.video.ExportPrivacy.generalize(renderModel) else renderModel
-        val safeTrip = if (generalizeHomeAddress) trip.copy(title = com.traveler.feature.video.ExportPrivacy.label(trip.title)) else trip
+        val safeTrip = if (generalizeHomeAddress) trip.copy(title = com.traveler.feature.video.ExportPrivacy.title(trip.title)) else trip
         val timeline = buildExportTimeline(safeTrip, safeModel, profile)
         val terrain = com.traveler.core.terrain.JourneyTerrain.load(context,renderModel)
         val frozenMaps=ExportMapSnapshot.create(context) { onProgress?.invoke(it*.03f) }

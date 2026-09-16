@@ -188,7 +188,7 @@ class TravelGlRenderer(private val context: Context, val scene: SceneGeometry,
         if(state!=null && motion!=null && !state.isTitleCardActive && !state.isEndCardActive) {
             val mode=state.currentTransportMode
             val modelSize=VehicleAnimation.scale(distance,width,height,mode)
-            val pose=VehicleAnimation.pose(mode,state.progress.toDouble()*scene.timeline.totalStoryDurationSeconds,
+            val pose=VehicleAnimation.pose(mode,state.animationTimeSeconds ?: (state.progress.toDouble()*scene.timeline.totalStoryDurationSeconds),
                 motion.slope,motion.turn,state.currentSegment!=null)
             val front=motion.forward.unit();val right=front.cross(up).unit()
             val pitchedFront=front*cos(pose.pitch)+up*sin(pose.pitch)

@@ -60,9 +60,8 @@ internal fun PlaybackOverlays(state: TravelPlaybackState, timeline: TravelStoryT
                 var aspect by remember { mutableStateOf(1.5f) }
                 val top = headerHeight + 24.dp
                 val maxPhotoWidth = minOf(180.dp, maxWidth * .38f)
-                // Reserve controls, credits and caption, including when font size is enlarged.
-                val captionSpace = with(density) { 16.sp.toDp() } + 10.dp
-                val available = (maxHeight - top - 90.dp - captionSpace).coerceAtLeast(0.dp)
+                // Reserve controls and credits; photos have no redundant Stop caption.
+                val available = (maxHeight - top - 90.dp).coerceAtLeast(0.dp)
                 val maxPhotoHeight = minOf(180.dp, maxHeight * .38f, available)
                 if (maxPhotoHeight >= 24.dp) {
                     val fitted = PlaybackOverlayContent.fitPhoto(aspect, 1f, maxPhotoWidth.value, maxPhotoHeight.value)
@@ -77,9 +76,7 @@ internal fun PlaybackOverlays(state: TravelPlaybackState, timeline: TravelStoryT
                                     aspect = drawable.intrinsicWidth.toFloat() / drawable.intrinsicHeight
                             },
                             modifier = Modifier.size(fitted.width.dp, fitted.height.dp).testTag("playback-photo"))
-                        Text(state.currentVisit?.placeName ?: photo.assignedDayIso ?: "Photo", color = Color.White,
-                            fontSize = 10.sp, lineHeight = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier.padding(top = 3.dp))
+
                     }
                 }
             }

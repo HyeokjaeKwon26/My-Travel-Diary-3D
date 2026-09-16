@@ -73,8 +73,8 @@ data class TimelineStoryDiagnostics(
  * Invariants:
  * 1. Timeline is authoritative: Traveler position, heading, mode, and camera are computed
  *    EXCLUSIVELY from the canonical route and active episode.
- * 2. Photos are pure passive overlays: Displaying a photo NEVER modifies story time,
- *    marker coordinates, camera target, or node index.
+ * 2. Movement photos insert deterministic holds on the canonical route. Photo GPS never
+ *    moves the marker; travel resumes at exactly the held route position.
  * 3. Strict Monotonicity: Progress in [0.0 .. 1.0] maps monotonically to story time (0 rewinds).
  */
 class TravelStoryTimeline private constructor(
@@ -89,6 +89,10 @@ class TravelStoryTimeline private constructor(
     val totalTripDistanceMeters: Double = 0.0,
     private val episodeStartDistances: DoubleArray = DoubleArray(0)
 ) {
+    private val movementPhotos = photoMoments.groupBy { it.parentEpisodeIndex }
+        .filterKeys { episodes.getOrNull(it) is StoryEpisode.MovementEpisode }
+    private val allMovementPhotos = movementPhotos.values.flatten()
+
     /**
      * Evaluates playback state at progress in [0.0 .. 1.0] using O(log N) binary search.
      */
@@ -185,8 +189,14 @@ class TravelStoryTimeline private constructor(
 
         val activeEpisode = episodes[episodeIndex]
         val epStart = episodeStartTimes[episodeIndex]
-        val epProgress = if (activeEpisode.durationStorySeconds > 0f) {
-            ((storyTimeSeconds - epStart) / activeEpisode.durationStorySeconds).coerceIn(0.0f, 1.0f)
+        val holds = movementPhotos[episodeIndex].orEmpty()
+        val routeClock = holds.firstOrNull { storyTimeSeconds >= it.displayStartStorySeconds && storyTimeSeconds < it.displayEndStorySeconds }
+            ?.displayStartStorySeconds ?: storyTimeSeconds
+        val heldSeconds = holds.sumOf { (routeClock - it.displayStartStorySeconds)
+            .coerceIn(0f, it.durationStorySeconds).toDouble() }.toFloat()
+        val travelDuration = activeEpisode.durationStorySeconds - holds.sumOf { it.durationStorySeconds.toDouble() }.toFloat()
+        val epProgress = if (travelDuration > 0f) {
+            ((routeClock - epStart - heldSeconds) / travelDuration).coerceIn(0.0f, 1.0f)
         } else {
             1.0f
         }
@@ -361,7 +371,10 @@ class TravelStoryTimeline private constructor(
                     dayTransitionLabel = dayLabel,
                     isDayTransitionActive = isDayTransition,
                     currentAltitudeMeters = alt,
-                    currentSpeedKmh = currentSpeed,
+                    currentSpeedKmh = if (activePhoto != null) 0.0 else currentSpeed,
+                    animationTimeSeconds = routeClock.toDouble() - allMovementPhotos.sumOf {
+                        (routeClock.toDouble() - it.displayStartStorySeconds).coerceIn(0.0, it.durationStorySeconds.toDouble())
+                    },
                     currentTraveledDistanceMeters = currentTraveledDist,
                     totalTripDistanceMeters = totalTripDistanceMeters
                 )
@@ -790,14 +803,42 @@ class TravelStoryTimeline private constructor(
                 }
             }
 
+            // Add photo dwell time instead of stealing travel time and accelerating between photos.
+            // A hold is anchored on the canonical route at the original scheduled time, never photo GPS.
+            val expandedEpisodes = monotonicEpisodes.toMutableList()
+            val expandedPhotos = mutableListOf<PhotoStoryMoment>()
+            val expandedStarts = starts.copyOf()
+            var shift = 0f
+            for (i in monotonicEpisodes.indices) {
+                val ep = monotonicEpisodes[i]
+                expandedStarts[i] += shift
+                val moments = scheduledPhotoMoments.filter { it.parentEpisodeIndex == i }.sortedBy { it.scheduledStoryTimeSeconds }
+                val added = if (ep is StoryEpisode.MovementEpisode) moments.sumOf { it.durationStorySeconds.toDouble() }.toFloat() else 0f
+                var priorHolds = 0f
+                for (moment in moments) {
+                    val start = if (ep is StoryEpisode.MovementEpisode) moment.scheduledStoryTimeSeconds + shift + priorHolds
+                        else moment.displayStartStorySeconds + shift
+                    expandedPhotos.add(moment.copy(
+                        displayStartStorySeconds = start,
+                        displayEndStorySeconds = start + moment.durationStorySeconds,
+                        scheduledStoryTimeSeconds = start + moment.durationStorySeconds / 2,
+                        parentEpisodeStoryStart = starts[i] + shift,
+                        parentEpisodeStoryEnd = starts[i] + shift + ep.durationStorySeconds + added
+                    ))
+                    if (ep is StoryEpisode.MovementEpisode) priorHolds += moment.durationStorySeconds
+                }
+                if (ep is StoryEpisode.MovementEpisode) expandedEpisodes[i] = ep.copy(durationStorySeconds = ep.durationStorySeconds + added)
+                shift += added
+            }
+
             return TravelStoryTimeline(
                 profile = profile,
-                episodes = monotonicEpisodes,
-                photoMoments = scheduledPhotoMoments,
+                episodes = expandedEpisodes,
+                photoMoments = expandedPhotos,
                 titleCard = titleCard,
                 endCard = endCard,
-                totalStoryDurationSeconds = totalDuration,
-                episodeStartTimes = starts,
+                totalStoryDurationSeconds = totalDuration + shift,
+                episodeStartTimes = expandedStarts,
                 diagnostics = storyDiagnostics,
                 totalTripDistanceMeters = totalTripDist,
                 episodeStartDistances = startDistances

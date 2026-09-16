@@ -33,6 +33,8 @@ fun HomeScreen(
     onNavigateToTripDetail: (String) -> Unit
 ) {
     val trips by viewModel.trips.collectAsState()
+    val sort by viewModel.sort.collectAsState()
+    val ascending by viewModel.ascending.collectAsState()
     val context=androidx.compose.ui.platform.LocalContext.current
     val scope=rememberCoroutineScope()
     val restore=androidx.activity.compose.rememberLauncherForActivityResult(androidx.activity.result.contract.ActivityResultContracts.OpenDocument()) { uri ->
@@ -88,9 +90,27 @@ fun HomeScreen(
             } else {
                 LazyColumn(
                     modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(16.dp),
+                    contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 100.dp),
                     verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
+                    item(key = "sort-controls") {
+                        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                            var expanded by remember { mutableStateOf(false) }
+                            Box(Modifier.weight(1f)) {
+                                TextButton(onClick = { expanded = true }) { Text("정렬: ${sort.label} ▾") }
+                                DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+                                    TripSort.entries.forEach { option ->
+                                        DropdownMenuItem(text = { Text(option.label) }, onClick = {
+                                            viewModel.setSort(option); expanded = false
+                                        })
+                                    }
+                                }
+                            }
+                            TextButton(onClick = { viewModel.setSort(sort, !ascending) }) {
+                                Text(if (ascending) "↑ 오름차순" else "↓ 내림차순")
+                            }
+                        }
+                    }
                     items(trips, key = { it.id }) { trip ->
                         TripCard(
                             trip = trip,

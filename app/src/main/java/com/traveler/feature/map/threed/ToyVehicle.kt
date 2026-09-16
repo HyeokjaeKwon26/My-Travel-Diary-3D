@@ -36,7 +36,40 @@ object ToyVehicle {
                 face(1.44,.86)
                 for(x in listOf(-.95,.95)) for(z in listOf(-.85,.85)) wheel(x,z)
             }
-            TransportMode.BUS,TransportMode.TRAIN,TransportMode.SUBWAY -> {
+            TransportMode.TRAIN -> {
+                // KTX-inspired streamlined power car + articulated passenger coach. +Z is the nose.
+                for (z in listOf(.4, -2.15)) {
+                    box(0.0,.40,z,1.15,.25,2.25,ink)
+                    box(0.0,.94,z,1.28,.91,2.25,white)
+                    box(0.0,1.44,z,1.15,.16,2.22,white)
+                    for (x in listOf(-.65,.65)) {
+                        box(x,.72,z,.025,.22,2.20,blue)
+                        for (w in listOf(-.72,-.24,.24,.72)) box(x,1.14,z+w,.035,.31,.33,ink)
+                    }
+                    for (x in listOf(-.60,.60)) for (w in listOf(-.76,.76)) wheel(x,z+w,.22)
+                }
+                box(0.0,.86,-.89,.88,.67,.30,ink) // flexible gangway
+                // Elliptical cross sections taper down into the long, low bullet nose.
+                val sections = listOf(doubleArrayOf(1.50,.95,.64,.52), doubleArrayOf(1.95,.87,.58,.44),
+                    doubleArrayOf(2.45,.69,.40,.29), doubleArrayOf(2.93,.56,.12,.12))
+                for (i in 0 until sections.lastIndex) for (j in 0 until 12) {
+                    fun ring(k:Int,n:Int):Vec3 {
+                        val q=sections[k]; val a=n*PI/6
+                        return p(cos(a)*q[2],q[1]+sin(a)*q[3],q[0])
+                    }
+                    val c=if(j>=6) blue else white
+                    b.tri(ring(i,j),ring(i+1,j),ring(i+1,j+1),c)
+                    b.tri(ring(i,j),ring(i+1,j+1),ring(i,j+1),c,.88f)
+                }
+                b.ball(p(0.0,.56,2.93),p(.12,.12,.13),blue)
+                // Swept panoramic windshield, bright headlights, roof pantograph.
+                b.wedge(p(-.45,1.37,1.67),p(.45,1.37,1.67),p(0.0,1.05,2.18),.045,ink)
+                for(x in listOf(-.25,.25)) b.ball(p(x,.71,2.55),p(.09,.055,.065),white)
+                b.rod(p(-.35,1.54,-.1),p(0.0,1.87,-.36),.035,ink)
+                b.rod(p(0.0,1.87,-.36),p(.35,1.54,-.1),.035,ink)
+                box(0.0,1.89,-.36,.85,.055,.12,ink)
+            }
+            TransportMode.BUS,TransportMode.SUBWAY -> {
                 val train=mode!=TransportMode.BUS
                 val color=if(mode==TransportMode.BUS)red else if(mode==TransportMode.TRAIN)blue else green
                 box(0.0,.52,0.0,1.95,.42,3.6,ink)

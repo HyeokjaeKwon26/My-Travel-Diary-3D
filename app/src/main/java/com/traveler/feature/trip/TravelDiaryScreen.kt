@@ -1,6 +1,8 @@
 package com.traveler.feature.trip
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -176,6 +178,7 @@ fun TravelDiaryScreen(
                                     when (item) {
                                         is TripDayItem.VisitItem -> {
                                             VisitCard(
+                                                routeOverview = if (item.visit.id == allVisits.maxByOrNull { it.endTimestampEpochMs }?.id && isHomeVisit(item.visit)) TravelMapRenderModel(allVisits, allSegments) else null,
                                                 visit = item.visit,
                                                 photos = item.photos,
                                                 onCardClick = { viewModel.focusLocation(item.visit.location) },
@@ -399,6 +402,7 @@ private fun DayHeader(day: TripDay) {
 @Composable
 private fun VisitCard(
     visit: Visit,
+    routeOverview: TravelMapRenderModel? = null,
     photos: List<MediaItem>,
     onCardClick: () -> Unit,
     onEditNameClick: () -> Unit,
@@ -477,7 +481,13 @@ private fun VisitCard(
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
 
-            if (photos.isNotEmpty()) {
+            if (routeOverview != null) {
+                Spacer(Modifier.height(12.dp))
+                TripRouteOverview(routeOverview)
+                if (photos.isNotEmpty()) TextButton(onClick = { onViewAllClick?.invoke(photos) ?: onPhotoClick(photos.first()) }) {
+                    Text("사진 ${photos.size}장 보기")
+                }
+            } else if (photos.isNotEmpty()) {
                 Spacer(modifier = Modifier.height(12.dp))
                 PhotoVisualHierarchy(photos = photos, onPhotoClick = onPhotoClick, onViewAllClick = onViewAllClick)
             }
@@ -800,25 +810,25 @@ fun FullscreenPhotoDialog(
     }
     var showTechDetails by remember(initialShowTechDetails) { mutableStateOf(initialShowTechDetails) }
 
+    val configuration = androidx.compose.ui.platform.LocalConfiguration.current
+    val hostView = androidx.compose.ui.platform.LocalView.current
+    val hostInsets = remember(configuration, hostView) {
+        androidx.core.view.ViewCompat.getRootWindowInsets(hostView)?.getInsets(
+            androidx.core.view.WindowInsetsCompat.Type.systemBars() or
+                androidx.core.view.WindowInsetsCompat.Type.displayCutout())
+    }
+    val hostSafeArea = WindowInsets(hostInsets?.left ?: 0, hostInsets?.top ?: 0,
+        hostInsets?.right ?: 0, hostInsets?.bottom ?: 0)
     Dialog(
         onDismissRequest = onDismiss,
-        properties = DialogProperties(usePlatformDefaultWidth = false)
+        properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false)
     ) {
-        Box(
+        Column(
             modifier = Modifier
                 .fillMaxSize()
                 .background(Color(0xFF090D16))
+                .windowInsetsPadding(WindowInsets.safeDrawing.union(hostSafeArea))
         ) {
-            // Main Image
-            AsyncImage(
-                model = photo.contentUriString,
-                contentDescription = photo.fileName,
-                contentScale = ContentScale.Fit,
-                modifier = Modifier
-                    .fillMaxSize()
-                    .clickable(onClick = onDismiss)
-            )
-
             // Top App Bar
             Row(
                 modifier = Modifier
@@ -846,11 +856,20 @@ fun FullscreenPhotoDialog(
                 }
             }
 
+            // Main Image
+            AsyncImage(
+                model = photo.contentUriString,
+                contentDescription = photo.fileName,
+                contentScale = ContentScale.Fit,
+                modifier = Modifier
+                    .fillMaxWidth().weight(1f)
+                    .clickable(onClick = onDismiss)
+            )
+
             // Bottom Info Overlay / Expandable Panel
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .align(Alignment.BottomCenter)
                     .background(Color.Black.copy(alpha = 0.75f))
                     .padding(16.dp)
             ) {
@@ -870,6 +889,9 @@ fun FullscreenPhotoDialog(
                     }
                 }
 
+                Column(Modifier.fillMaxWidth()
+                    .heightIn(max = (configuration.screenHeightDp * .22f).coerceAtLeast(64f).dp)
+                    .verticalScroll(rememberScrollState())) {
                 Text(
                     text = captureTimeStr,
                     color = Color.White,
@@ -909,6 +931,8 @@ fun FullscreenPhotoDialog(
                     }
                 }
 
+                }
+
                 Spacer(modifier = Modifier.height(10.dp))
 
                 Button(
@@ -917,7 +941,7 @@ fun FullscreenPhotoDialog(
                         containerColor = if (photo.isRepresentative) Color(0xFFF59E0B) else Color(0xFF334155)
                     ),
                     shape = RoundedCornerShape(8.dp),
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)
                 ) {
                     Text(
                         text = if (photo.isRepresentative) "★ Representative Memory" else "☆ Use as Representative Photo",
