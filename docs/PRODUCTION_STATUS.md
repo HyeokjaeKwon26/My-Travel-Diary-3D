@@ -1,3 +1,26 @@
+# 1.0.0-rc9 offline nearby-region summaries
+
+Date: 2026-09-16. Existing saved visit coordinates now supplement missing/generic Home/Work names using the bundled city/landmark catalog. Every derived label ends in `인근` (near). The resolver chooses the nearest catalog city within 60 km or landmark within 40 km; it does not establish city-boundary membership or an attraction visit. Areas beyond catalog coverage remain unresolved. No network lookup, new map pack, schema migration or mutation of recorded names is involved.
+
+Representative labels collapse repeated names/regions. User edits precede recorded specific names, then inferred regions, then generic home/work regions. Within a tier, a bounded per-visit dwell contribution, logarithmic photo count and uncovered visit-start dates select up to three labels. Invalid/missing stored timezones use UTC for this internal ranking, independently of the phone timezone. Remaining unresolved visits have their own count. Visit counts remain source-ID based.
+
+The reactive Room projection now includes only coordinates/times/name override metadata and grouped matched-media counts; it still loads no images, polylines or timezone engine. Summary work runs off the main thread, reuses repeated coordinates within a calculation and shares its selection rules with detail loading. Legacy name caches and archives remain unchanged. Maps, replay and exports are unchanged.
+
+## RC9 verification
+
+- 330 JVM tests passed, with no failures, errors or skips. Six new cases cover explicitly approximate/deduplicated city and landmark labels, remote ocean coordinates, recorded/manual-name precedence, home deprioritization, dwell/photo ranking and date coverage.
+- Five Android tests passed with airplane mode enabled and Wi-Fi disabled. They cover legacy unnamed records, home/detail consistency, durable renames across overlapping trips, multi-day deduplication, reactive photo reassignment ranking, and narrow cards at 150% font scale. Original missing names stayed null in the database. The synthetic offline card shows Las Vegas, Grand Canyon and Niagara Falls as nearby, while a remote ocean stop stays unresolved. Screenshots inspected: [offline regions](verification-3d/rc9-offline-regions.png), [large-font card](verification-3d/rc9-card-large-font.png).
+- An external emulator System UI ANR at cold boot was dismissed before testing; no app ANR or test failure was observed in the completed run. Local JVM/debug/instrumentation/lint and optimized-release builds passed (lint: 0 errors, 86 warnings, 8 informational findings). The production-signed universal APK was installed over the existing emulator installation and restarted in airplane mode. Both saved journeys remained (31.2 km / 2 visits and 835.5 km / 5 visits, with 0 and 4 photos); the latter now prioritizes Niagara Falls, Boston Back Bay and Skylon Tower using the new ranking. [Signed home screenshot](verification-3d/rc9-signed-home.png). Remote GitHub run `35135655855` was still running at local acceptance and is not counted as passed. Physical S23 Ultra testing remains unavailable.
+
+## RC9 packages
+
+Application source: `e68ba50`. Both packages use `com.traveler.threed`, version code 10 / `1.0.0-rc9` and the existing production signing certificate. Signature, package ID/version, ABI sets, APK ZIP alignment, 64-bit ELF 16 KiB alignment and native/map/timezone resource contracts pass.
+
+- `My-Travel-Diary-3D-1.0.0-rc9.apk`: 89414779 bytes; SHA-256 `77ec27d1392679ffb6d0b5db66cbff675cabae00d4530278512f2168b6fce794`.
+- `My-Travel-Diary-3D-1.0.0-rc9-arm64.apk`: 55901569 bytes; SHA-256 `12bdaf92d4b17ddb849de6f299be93c2e4b0de87dd34073494c3da8a58591dca`.
+
+---
+
 # 1.0.0-rc8 recorded-visit card summaries
 
 Date: 2026-09-16. Home cards previously counted a cached list of at most five named places. They now derive `방문 기록 N회` from distinct saved visit source IDs, including unnamed stops and separate returns. A source spanning multiple days is counted once. A separate `대표 장소` preview lists up to three distinct normalized recorded names plus the remaining named entries. Specific names precede Home/Work; generic-only names alongside unnamed stops produce `장소 이름 정보 부족`. Partially named journeys identify their unnamed visit count.
