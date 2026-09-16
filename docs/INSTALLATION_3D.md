@@ -6,12 +6,12 @@
 
 ## 1. 앱 설치하기
 
-Android 8.0 이상인 휴대폰이나 태블릿에서 사용할 수 있습니다. 현재 버전은 **1.0.0-rc11 (시험 배포)**입니다.
+Android 8.0 이상인 휴대폰이나 태블릿에서 사용할 수 있습니다. 현재 버전은 **1.0.0-rc12 (시험 배포)**입니다.
 
 | 기기 | 설치 파일 |
 | --- | --- |
-| 갤럭시 S23 Ultra 등 대부분의 최근 Android 휴대폰·태블릿 | [추천 APK 받기 — 약 56 MB](https://github.com/HyeokjaeKwon26/My-Travel-Diary-3D/releases/download/v1.0.0-rc11/My-Travel-Diary-3D-1.0.0-rc11-arm64.apk) |
-| 위 파일이 기기와 호환되지 않을 때 | [범용 APK 받기 — 약 89 MB](https://github.com/HyeokjaeKwon26/My-Travel-Diary-3D/releases/download/v1.0.0-rc11/My-Travel-Diary-3D-1.0.0-rc11.apk) |
+| 갤럭시 S23 Ultra 등 대부분의 최근 Android 휴대폰·태블릿 | [추천 APK 받기 — 약 56 MB](https://github.com/HyeokjaeKwon26/My-Travel-Diary-3D/releases/download/v1.0.0-rc12/My-Travel-Diary-3D-1.0.0-rc12-arm64.apk) |
+| 위 파일이 기기와 호환되지 않을 때 | [범용 APK 받기 — 약 89 MB](https://github.com/HyeokjaeKwon26/My-Travel-Diary-3D/releases/download/v1.0.0-rc12/My-Travel-Diary-3D-1.0.0-rc12.apk) |
 
 APK는 Android 앱 설치 파일입니다. **둘 중 하나만** 받으면 됩니다.
 
@@ -45,6 +45,8 @@ APK는 Android 앱 설치 파일입니다. **둘 중 하나만** 받으면 됩�
 ## 4. 여행 재생하기
 
 여행 카드를 열고 **지도 안의 ▶ 버튼**을 누릅니다.
+
+조작부는 재생 중 약 3초 동안 조작하지 않으면 부드럽게 사라집니다. **지도 화면을 한 번 터치하면 다시 표시**되며, 재생은 계속됩니다. 일시정지하거나 재생 막대를 누르고 있는 동안에는 사라지지 않습니다. 재생 중 위치를 옮기면 놓은 지점부터 이어서 재생하고, 일시정지 상태에서 옮기면 멈춘 상태를 유지합니다. 가로의 넓은 화면에서는 조작부를 한 줄로 표시합니다. 접근성 설정에 따라 표시 시간이 늘어날 수 있습니다.
 
 | 하고 싶은 일 | 조작 방법 |
 | --- | --- |

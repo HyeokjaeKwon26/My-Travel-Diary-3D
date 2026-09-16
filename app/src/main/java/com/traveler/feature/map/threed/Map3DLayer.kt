@@ -15,6 +15,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.sp
 import com.traveler.core.terrain.*
 import com.traveler.feature.map.renderer.*
@@ -23,7 +24,7 @@ import kotlinx.coroutines.*
 
 @Composable
 fun Map3DLayer(model:TravelMapRenderModel,timeline:TravelStoryTimeline,state:TravelPlaybackState?, playing:Boolean=false,
-               showOptions:Boolean=false, onDismissOptions:()->Unit={},
+               showOptions:Boolean=false, onDismissOptions:()->Unit={}, controlsBottomInset:Dp=112.dp,
                fallback:@Composable ()->Unit) {
     val context=LocalContext.current
     val scope=rememberCoroutineScope()
@@ -90,7 +91,7 @@ fun Map3DLayer(model:TravelMapRenderModel,timeline:TravelStoryTimeline,state:Tra
         if (scene?.uncertain(state) == true) Text("Height estimated",
             color=Color.White, fontSize=12.sp, modifier=Modifier.align(Alignment.Center)
                 .background(Color(0xDD102638),RoundedCornerShape(8.dp)).padding(8.dp))
-        if(use3D) Column(Modifier.align(Alignment.BottomStart).padding(start=6.dp,bottom=if (state != null) 112.dp else 8.dp)
+        if(use3D) Column(Modifier.align(Alignment.BottomStart).padding(start=6.dp,bottom=if (state != null) controlsBottomInset else 8.dp)
             .background(Color(0xDD102638),RoundedCornerShape(6.dp)).padding(horizontal=6.dp,vertical=3.dp)) {
             if(!mapStatus.startsWith("Street map")) Text(mapStatus,color=Color.White,fontSize=9.sp,lineHeight=11.sp)
             Text("N ↑ · © OpenStreetMap contributors · Natural Earth",color=Color.White,fontSize=9.sp,lineHeight=11.sp,

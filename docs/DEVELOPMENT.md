@@ -7,7 +7,7 @@ For installation and everyday use, see the [user guide](INSTALLATION_3D.md). Thi
 My Travel Diary 3D is an independent edition of [My Travel Diary](https://github.com/HyeokjaeKwon26/My-Travel-Diary), based on original commit `9bcfb4f`. Original attribution and history are retained under AGPL-3.0.
 
 - Application ID: `com.traveler.threed`; the original `com.traveler` app is separate.
-- RC11: version `1.0.0-rc11`, version code `12`.
+- RC12: version `1.0.0-rc12`, version code `13`.
 - Minimum Android version: 8.0 (API 26).
 - No automatic import of the original app's private storage.
 
