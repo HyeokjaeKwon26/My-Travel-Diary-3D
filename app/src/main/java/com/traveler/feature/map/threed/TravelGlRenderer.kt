@@ -254,10 +254,13 @@ class TravelGlRenderer(private val context: Context, val scene: SceneGeometry,
         streets.request(plan)
         val now=android.os.SystemClock.uptimeMillis()
         if(moved || ((mapRevision!=streets.version || paintedTiles!=plan.tiles) && now-lastMapUpload>=600)) {
+            // A tile arriving during the upload must trigger another frame.
+            // Recording the later revision could acknowledge a tile we never painted.
+            val paintedRevision=streets.version
             val bitmap=referenceRaster!!.copy(android.graphics.Bitmap.Config.ARGB_8888,true)
             streets.paint(android.graphics.Canvas(bitmap),w,bitmap.width,plan)
             try { GLUtils.texImage2D(GL.GL_TEXTURE_2D,0,bitmap,0) } finally { bitmap.recycle() }
-            mapRevision=streets.version;paintedTiles=plan.tiles;lastMapUpload=now
+            mapRevision=paintedRevision;paintedTiles=plan.tiles;lastMapUpload=now
         }
         GL.glUniform4f(mapBoundsUniform,w.x.toFloat(),w.y.toFloat(),(1/w.span).toFloat(),0f)
         GL.glUniform1i(mapTextureUniform,1)
