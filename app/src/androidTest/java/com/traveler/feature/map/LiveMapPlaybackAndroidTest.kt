@@ -34,7 +34,9 @@ class LiveMapPlaybackAndroidTest {
             val points=if(i%2==0) segment.simplifiedPoints else segment.simplifiedPoints.reversed()
             segment.copy(id="offline-loop-$i",startTimestampEpochMs=segment.startTimestampEpochMs+i*3_600_000L,
                 endTimestampEpochMs=segment.startTimestampEpochMs+(i+1)*3_600_000L,
-                startPoint=points.first(),endPoint=points.last(),simplifiedPoints=points)
+                startPoint=points.first(),endPoint=points.last(),simplifiedPoints=points,
+                transport=com.traveler.core.model.TransportPrediction(if(i%2==0) com.traveler.core.model.TransportMode.CAR
+                    else com.traveler.core.model.TransportMode.BUS,1f,"offline fixture"))
         }
         val device=UiDevice.getInstance(InstrumentationRegistry.getInstrumentation())
         compose.mainClock.autoAdvance=false
@@ -53,7 +55,7 @@ class LiveMapPlaybackAndroidTest {
             val values=mutableListOf(progress())
             compose.onNodeWithContentDescription("Play").performClick()
             repeat(5) {
-                Thread.sleep(600);compose.mainClock.advanceTimeBy(650)
+                Thread.sleep(600);compose.mainClock.advanceTimeBy(32)
                 values.add(progress())
             }
             assertTrue("Offline map stopped story: $values",values.zipWithNext().all { (a,b)-> b>a })

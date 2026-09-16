@@ -174,7 +174,14 @@ class StreetMapSession(context:Context,private val network:Boolean=false,
             checked[tile]=max(expires,now+60_000)
             trimDisk()
         } catch(_:Exception) { /* Cached map and bundled geography remain visible. */ }
-        finally { connection?.disconnect();connection=null;requestedTile=null;updateStatus() }
+        finally {
+            // A cancelled viewport request is not a server failure. Retrying a quick
+            // revisit must not be suppressed by the ordinary one-minute error cooldown.
+            val cancelled=(connection!=null && cancelling===connection) || !active
+            connection?.disconnect();connection=null;requestedTile=null
+            if(cancelled) checked.remove(tile)
+            updateStatus()
+        }
     }
     companion object { @Volatile private var blockedUntil=0L }
     private fun decode(file:File):Bitmap? = runCatching {
