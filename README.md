@@ -1,5 +1,7 @@
 # My Travel Diary 3D
 
+**한국어** · **[English](README.en.md)**
+
 ### 다녀온 길 위에서, 여행이 다시 시작됩니다.
 
 어디를 지나갔는지, 그곳에서 어떤 사진을 찍었는지. **My Travel Diary 3D**는 Google 지도 타임라인의 이동 기록과 휴대폰 사진을 모아, **움직이는 3D 여행 일기와 공유할 수 있는 영상**으로 만들어 주는 Android 앱입니다.
@@ -30,6 +32,12 @@ Android 8.0 이상 · 휴대폰·태블릿 · 현재 공개 버전 **1.0.0-rc12 
 | <img src="docs/verification-3d/rc10-signed-home.png" width="260" alt="이름순 정렬과 여행별 거리, 사진 수, 방문 기록이 표시된 여행 목록" /> | <img src="docs/verification-3d/rc12-controls-portrait.png" width="260" alt="그랜드 캐니언 예시 경로와 캐릭터, 날짜, 작은 재생 조작부가 보이는 세로 전체화면" /> | <img src="docs/verification-3d/rc10-encoded-cover.png" width="260" alt="앱에서 만든 MP4의 시작 화면. 보라색 배경과 금색 테두리, 색종이 장식 위에 여행 제목이 표시됩니다." /> |
 
 *예시 여행 데이터를 사용한 실제 앱 화면과 저장된 영상의 한 장면입니다. 화면 구성과 글꼴은 기기 설정에 따라 달라질 수 있습니다.*
+
+### 손대지 않으면, 여행만 남는 화면
+
+재생 조작부는 약 3초 후 사라지고, 지도를 한 번 터치하면 다시 나타납니다. 일시정지하거나 재생 막대를 움직이는 동안에는 계속 표시됩니다. 가로의 넓은 화면에서는 한 줄로 모아 지도를 덜 가립니다.
+
+<img src="docs/verification-3d/rc12-controls-hidden.png" width="280" alt="재생 조작부가 자동으로 숨겨진 전체화면. 지도와 자동차, 날짜가 보이며 지도 아래까지 넓게 감상할 수 있습니다." />
 
 ## 먼저, 예시 여행부터 즐겨 보세요
 
@@ -86,12 +94,27 @@ Android 휴대폰과 태블릿의 화면 크기에 맞춰 구성을 조절합니
 
 여행 기록과 사진 분석, 영상 만들기는 휴대폰에서 처리하며 사진 원본이나 타임라인 파일을 업로드하지 않습니다. 지도·지형을 불러오는 통신과 사진 분석 도구의 사용 진단 정보 전송은 있을 수 있습니다. [개인정보 안내](docs/PRIVACY_3D.md)를 확인해 주세요.
 
+## 만든이와 프로젝트
+
+제작자: **[HyeokjaeKwon26](https://github.com/HyeokjaeKwon26)**
+
+[원래 My Travel Diary](https://github.com/HyeokjaeKwon26/My-Travel-Diary)에서 출발해, 입체 지형과 움직이는 캐릭터로 여행을 되돌아보는 **My Travel Diary 3D**로 이어지는 프로젝트입니다. 3D 버전은 별도 앱이라 기존 2D 앱과 함께 설치할 수 있습니다.
+
+## Disclaimer · 사용 전 알아두세요
+
+- **여행을 추억하기 위한 앱입니다.** 지도·고도·장소 이름·이동수단에는 오차가 있을 수 있습니다. 끊긴 경로의 연결과 캐릭터 움직임에는 추정·연출이 포함되므로 길 안내나 정확한 위치 증명 용도로 사용하지 마세요.
+- **원본과 백업을 보관하세요.** 여행에 저장되는 사진 선택 결과와 백업 파일은 원본 사진의 복사본이 아닙니다. 원본 삭제, 접근 권한 변경, 앱 삭제로 사진이나 여행 기록을 더 이상 볼 수 없게 될 수 있습니다.
+- **공유 전에 영상을 확인하세요.** 장소 이름을 일반화해도 경로, 지도 글자, 사진 속 개인정보까지 가려지지는 않습니다. 지도·지형 요청에는 통신과 데이터 사용이 발생할 수 있습니다.
+- **현재는 시험 배포 버전입니다.** 기기에 따라 재생·영상 생성 성능이 다를 수 있습니다. 보증 및 책임 제한 조건은 [AGPL-3.0 라이선스](LICENSE)의 15–17항을 따릅니다.
+
+**[전체 Disclaimer — 한국어 / English](DISCLAIMER.md)** · **[개인정보 안내](docs/PRIVACY_3D.md)**
+
 ---
 
 ### 더 알아보기
 
 **[설치·사용 안내](docs/INSTALLATION_3D.md)** · **[다운로드와 버전 소식](https://github.com/HyeokjaeKwon26/My-Travel-Diary-3D/releases)** · **[문제·의견 보내기](https://github.com/HyeokjaeKwon26/My-Travel-Diary-3D/issues)**
 
-[My Travel Diary](https://github.com/HyeokjaeKwon26/My-Travel-Diary)를 바탕으로 만든 별도의 3D 앱입니다. 기존 앱과 함께 설치할 수 있습니다. 지도: © [OpenStreetMap contributors](https://www.openstreetmap.org/copyright), Natural Earth. 지형·음악 출처와 라이선스: [지형](docs/TERRAIN_PACKS.md) · [음악](docs/MUSIC_LICENSES.md) · [AGPL-3.0](LICENSE).
+지도: © [OpenStreetMap contributors](https://www.openstreetmap.org/copyright), Natural Earth. 지형·음악 출처와 라이선스: [지형](docs/TERRAIN_PACKS.md) · [음악](docs/MUSIC_LICENSES.md) · [AGPL-3.0](LICENSE).
 
 개발에 참여하거나 기술 정보를 찾는 분은 **[개발자 문서](docs/DEVELOPMENT.md)**를 참고해 주세요.

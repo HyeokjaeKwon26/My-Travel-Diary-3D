@@ -52,3 +52,5 @@ Older inherited documents and screenshots may describe the original 2D app. They
 ## Public documentation
 
 Keep the [README](../README.md) and [user guide](INSTALLATION_3D.md) focused on benefits, real screenshots, download links and practical steps. Put implementation details, build commands and test reports in developer documents. When publishing a version, check download links, button labels and screenshot relevance. Label illustrative data and do not promise full offline maps, retained photo originals or device performance that has not been implemented or verified.
+
+Update the [English README](../README.en.md), [English user guide](INSTALLATION_3D.en.md), and both languages of the [Disclaimer](../DISCLAIMER.md) alongside their Korean counterparts. Preserve license and source credits. Creator information must be supported by an identifiable source; do not infer a biography from the account name.
