@@ -3,28 +3,28 @@ package com.traveler.feature.map
 import androidx.compose.animation.*
 import androidx.compose.foundation.Canvas as ComposeCanvas
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalAccessibilityManager
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.onClick
+import kotlinx.coroutines.delay
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material.icons.filled.Fullscreen
-import androidx.compose.material.icons.filled.FullscreenExit
 import androidx.compose.ui.platform.testTag
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.traveler.core.common.geo.GeoPoint
@@ -110,6 +110,28 @@ fun TravelMapView(
     var playbackProgress by remember(initialPlaybackProgress) { mutableStateOf(initialPlaybackProgress) }
     var playbackSession by remember(initialIsPlaying, initialPlaybackProgress) { mutableStateOf(initialIsPlaying || initialPlaybackProgress > 0f) }
     var playbackSpeed by remember { mutableStateOf(1.0f) }
+    var controlsVisible by remember { mutableStateOf(true) }
+    var controlsInteraction by remember { mutableStateOf(0) }
+    var controlsPressed by remember { mutableStateOf(false) }
+    var isScrubbing by remember { mutableStateOf(false) }
+    var resumeAfterScrub by remember { mutableStateOf(false) }
+    var controlsHeight by remember { mutableStateOf(96.dp) }
+    val density = LocalDensity.current
+    val accessibility = LocalAccessibilityManager.current
+    fun revealControls() { controlsVisible = true; controlsInteraction++ }
+    fun toggleControls() {
+        if (controlsVisible && isPlaying && !isScrubbing) controlsVisible = false
+        else revealControls()
+    }
+    LaunchedEffect(isPlaying, playbackSession, fullscreen, showMapOptions) { revealControls() }
+    LaunchedEffect(controlsVisible, controlsInteraction, controlsPressed, isScrubbing, isPlaying, showMapOptions) {
+        if (controlsVisible && isPlaying && !controlsPressed && !isScrubbing && !showMapOptions) {
+            val timeout = accessibility?.calculateRecommendedTimeoutMillis(
+                3_000L, containsIcons = true, containsText = true, containsControls = true) ?: 3_000L
+            delay(timeout)
+            controlsVisible = false
+        }
+    }
     val playbackLifecycle = androidx.compose.ui.platform.LocalLifecycleOwner.current.lifecycle
     DisposableEffect(playbackLifecycle) {
         val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
@@ -195,10 +217,17 @@ fun TravelMapView(
     Box(
         // SurfaceView must punch through the window directly. An offscreen Compose
         // clipping layer covers its separate GPU surface on some Android versions.
-        modifier = modifier
+        modifier = modifier.testTag("playback-surface")
+            .pointerInput(playbackSession, isPlaying, controlsVisible) {
+                if (playbackSession) detectTapGestures(onTap = { toggleControls() })
+            }
+            .semantics {
+                if (playbackSession) onClick(label = "Show playback controls") { revealControls(); true }
+            }
     ) {
         com.traveler.feature.map.threed.Map3DLayer(renderModel, storyTimeline, currentActiveState, isPlaying,
-            showOptions = showMapOptions, onDismissOptions = onDismissMapOptions) {
+            showOptions = showMapOptions, onDismissOptions = onDismissMapOptions,
+            controlsBottomInset = if (playbackSession && controlsVisible) controlsHeight + 4.dp else 8.dp) {
     LaunchedEffect(Unit) {
         if (!RegionalBasemapCache.isReady) {
             val prep = RegionalBasemapCache.ensureLoaded(context.applicationContext)
@@ -277,160 +306,59 @@ fun TravelMapView(
             }
         }
 
-        // Bottom Playback Controls Bar (Only shown during playback)
+        // Live UI only: hiding controls must never change timeline, camera or export frames.
         AnimatedVisibility(
-            visible = isPlaybackActive,
-            enter = fadeIn(),
-            exit = fadeOut(),
+            visible = isPlaybackActive && controlsVisible,
+            enter = fadeIn(), exit = fadeOut(),
             modifier = Modifier.align(Alignment.BottomCenter)
         ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(Color.Black.copy(alpha = 0.70f))
-                    .padding(horizontal = 12.dp, vertical = 6.dp)
-            ) {
-                Text(PlaybackClockLabel.label(playbackProgress, storyTimeline.totalStoryDurationSeconds),
-                    color = Color.White, fontSize = 12.sp,
-                    modifier = Modifier.testTag("playback-time"))
-                    // Progress Scrubber Slider
-                    Slider(
-                        value = playbackProgress,
-                        onValueChange = {
-                            isPlaying = false
-                            timeTracker.seekTo(it)
-                            playbackProgress = it
-                        },
-                        modifier = Modifier.fillMaxWidth().height(32.dp).testTag("playback-seek"),
-                        colors = SliderDefaults.colors(
-                            thumbColor = MaterialTheme.colorScheme.primary,
-                            activeTrackColor = MaterialTheme.colorScheme.primary,
-                            inactiveTrackColor = Color.White.copy(alpha = 0.3f)
-                        )
-                    )
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    // Play / Pause Button
-                    IconButton(
-                        onClick = {
-                            if (playbackProgress >= 1.0f) {
-                                playbackProgress = 0f
-                                timeTracker.seekTo(0f)
-                            }
-                            isPlaying = !isPlaying
-                        },
-                        modifier = Modifier
-                            .size(36.dp)
-                            .clip(CircleShape)
-                            .background(MaterialTheme.colorScheme.primary)
-                    ) {
-                        Icon(
-                            imageVector = if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
-                            contentDescription = if (isPlaying) "Pause" else "Play",
-                            tint = Color.White,
-                            modifier = Modifier.size(20.dp)
-                        )
+            PlaybackControls(
+                progress = playbackProgress,
+                timeLabel = PlaybackClockLabel.label(playbackProgress, storyTimeline.totalStoryDurationSeconds),
+                isPlaying = isPlaying, speed = playbackSpeed, musicEnabled = isMusicEnabled,
+                fullscreen = fullscreen, canToggleFullscreen = onToggleFullscreen != null,
+                modifier = Modifier.onSizeChanged { controlsHeight = with(density) { it.height.toDp() } },
+                onPressChanged = { controlsPressed = it; if (it) revealControls() },
+                onSeek = {
+                    revealControls()
+                    if (!isScrubbing) { resumeAfterScrub = isPlaying; isScrubbing = true }
+                    isPlaying = false
+                    timeTracker.seekTo(it)
+                    playbackProgress = it
+                },
+                onSeekFinished = {
+                    if (isScrubbing) {
+                        isScrubbing = false
+                        isPlaying = resumeAfterScrub && playbackProgress < 1f
                     }
-
-                    // Reset / Replay Button
-                    IconButton(
-                        onClick = {
-                            playbackProgress = 0.0f
-                            timeTracker.seekTo(0.0f)
-                            isPlaying = true
-                        },
-                        modifier = Modifier.size(32.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Refresh,
-                            contentDescription = "Restart",
-                            tint = Color.White.copy(alpha = 0.8f),
-                            modifier = Modifier.size(18.dp)
-                        )
-                    }
-
-                    Spacer(Modifier.weight(1f))
-
-                    // Playback Speed Selector (P1-06)
-                    val speeds = listOf(0.5f, 1.0f, 1.5f, 2.0f, 3.0f)
-                    Box(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(6.dp))
-                            .background(Color.White.copy(alpha = 0.20f))
-                            .clickable {
-                                val nextIdx = (speeds.indexOf(playbackSpeed) + 1) % speeds.size
-                                val nextSpeed = speeds[nextIdx]
-                                playbackSpeed = nextSpeed
-                                timeTracker.playbackSpeed = nextSpeed
-                            }
-                            .padding(horizontal = 7.dp, vertical = 4.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        val speedText = if (playbackSpeed == 1.0f) "1×" else if (playbackSpeed == 0.5f) "0.5×" else if (playbackSpeed == 1.5f) "1.5×" else "${playbackSpeed.toInt()}×"
-                        Text(
-                            text = speedText,
-                            color = Color.White,
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
-
-                    // P1-21: Music Soundtrack Toggle Button
-                    Box(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(6.dp))
-                            .background(if (isMusicEnabled) MaterialTheme.colorScheme.primary.copy(alpha = 0.60f) else Color.White.copy(alpha = 0.15f))
-                            .clickable {
-                                isMusicEnabled = !isMusicEnabled
-                                soundtrackPlayer.isEnabled = isMusicEnabled
-                                if (isMusicEnabled && isPlaying) {
-                                    soundtrackPlayer.resume()
-                                } else {
-                                    soundtrackPlayer.pause()
-                                }
-                            }
-                            .padding(horizontal = 6.dp, vertical = 4.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = if (isMusicEnabled) "🎵" else "🔇",
-                            fontSize = 13.sp
-                        )
-                    }
-
-                    if (onToggleFullscreen != null) {
-                        IconButton(onClick = onToggleFullscreen, modifier = Modifier.size(48.dp)) {
-                            Icon(if (fullscreen) Icons.Default.FullscreenExit else Icons.Default.Fullscreen,
-                                contentDescription = if (fullscreen) "Exit fullscreen" else "Fullscreen", tint = Color.White)
-                        }
-                    }
-
-                    // Close Playback Button
-                    IconButton(
-                        onClick = {
-                            isPlaying = false
-                            playbackSession = false
-                            if (fullscreen) onToggleFullscreen?.invoke()
-                            soundtrackPlayer.stop()
-                            timeTracker.pause()
-                            timeTracker.seekTo(0.0f)
-                            playbackProgress = 0.0f
-                        },
-                        modifier = Modifier.size(32.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Close,
-                            contentDescription = "Exit Playback",
-                            tint = Color.White.copy(alpha = 0.8f),
-                            modifier = Modifier.size(18.dp)
-                        )
-                    }
+                    revealControls()
+                },
+                onPlayPause = {
+                    revealControls()
+                    if (playbackProgress >= 1f) { playbackProgress = 0f; timeTracker.seekTo(0f) }
+                    isPlaying = !isPlaying
+                },
+                onRestart = {
+                    revealControls(); playbackProgress = 0f; timeTracker.seekTo(0f); isPlaying = true
+                },
+                onSpeed = {
+                    revealControls()
+                    val speeds = listOf(.5f, 1f, 1.5f, 2f, 3f)
+                    playbackSpeed = speeds[(speeds.indexOf(playbackSpeed) + 1) % speeds.size]
+                    timeTracker.playbackSpeed = playbackSpeed
+                },
+                onMusic = {
+                    revealControls(); isMusicEnabled = !isMusicEnabled
+                    soundtrackPlayer.isEnabled = isMusicEnabled
+                    if (isMusicEnabled && isPlaying) soundtrackPlayer.resume() else soundtrackPlayer.pause()
+                },
+                onFullscreen = { revealControls(); onToggleFullscreen?.invoke() },
+                onClose = {
+                    isPlaying = false; playbackSession = false
+                    if (fullscreen) onToggleFullscreen?.invoke()
+                    soundtrackPlayer.stop(); timeTracker.pause(); timeTracker.seekTo(0f); playbackProgress = 0f
                 }
-            }
+            )
         }
     }
 }

@@ -1,3 +1,28 @@
+# 1.0.0-rc12 immersive playback controls
+
+Live playback controls fade away after approximately three seconds without interaction. Tapping the map reveals them without pausing the story; tapping again during playback hides them. Paused and ended playback keep controls visible. Button interaction restarts the timeout; pointer holds and scrubbing suspend it. The timeout honors Android accessibility recommendations. Existing date/day, photo and journey overlays remain visible.
+
+Portrait/compact screens use a clock-and-seek row plus a 48dp button row. Wide screens (at least 600dp, ordinary font scale) use one row; larger fonts retain the two-row layout. The thumb and track are visually smaller while buttons retain 48dp targets. Safe drawing insets protect controls from system navigation and display cutouts. Street-map attribution follows the measured control height and returns to the bottom when hidden. No camera framing, map provider, story timing or video render changes were made.
+
+Seeking now resumes only if playback was running before the gesture. Paused seeking remains paused, and seeking to the end shows replay controls. Fullscreen changes, lifecycle pauses and map settings reveal controls again.
+
+## RC12 verification
+
+- Three Android cases passed on the final UI source (114.375 seconds): small-phone/large-font button bounds, a 96dp inline bar without duplicated navigation insets, and wide one-row layout; idle timeout, touch/accessibility reveal, held seeking, paused/playing seek completion, interaction timeout reset and end-of-story behavior; existing fullscreen/rotation/Back position-and-clock regression.
+- A cold-boot emulator System UI ANR obscured the first screenshots despite passing Compose assertions. The system dialog was dismissed before subsequent runs. An early portrait capture preceded map preparation and was replaced with an actual prepared-map capture. The first release check also caught a missing explicit Material slider API opt-in; this was fixed, and final debug build/lint passed.
+- 13 focused JVM playback clock, speed, tracker and overlay tests passed with no failures/errors/skips. Final lint: 0 errors, 89 warnings, 9 informational findings.
+- [Compact landscape controls](verification-3d/rc12-controls-landscape.png) · [portrait controls](verification-3d/rc12-controls-portrait.png) · [controls hidden during playback](verification-3d/rc12-controls-hidden.png).
+- Optimized universal and ARM64 packages passed resource/JNI contracts, signing-certificate, version/ABI and ZIP/ELF alignment checks. The final universal APK installed in place over the existing app on a 720×1600 emulator; both saved journeys and sorting remained. A real coordinate-tap check confirmed idle controls disappear, map touch reveals them, and pause works (0:08 / 0:12, before the end). The embedded fullscreen button also moved down by the removed duplicate navigation inset. Physical S23 Ultra testing remains unavailable.
+
+## RC12 packages
+
+Application source: `36fe20b` (subsequent changes are documentation/screenshots). Version code 13 / `1.0.0-rc12`, same production signing certificate.
+
+- `My-Travel-Diary-3D-1.0.0-rc12.apk`: 89447551 bytes; SHA-256 `c07bb10516fdb8bf0144aa8c0c581161fe519096910a5d5a4f6e02422476530f`.
+- `My-Travel-Diary-3D-1.0.0-rc12-arm64.apk`: 55934341 bytes; SHA-256 `41485f1fba59129ad6021de10df87ef34422dce66005b1d4a212060ebcc49ce4`.
+
+---
+
 # 1.0.0-rc11 saved memories and fullscreen playback
 
 Photo analysis and per-profile photo selections now live in atomic, durable journey files under filesDir, outside Android's evictable cache. Existing journeys prepare this once; new imports prepare it while saving. Reopening unchanged metadata reads the saved selection without MediaStore queries, thumbnail decoding or ML inference. Failed analysis results are also frozen instead of silently changing on the next open. Saved photo additions/removals and representative overrides invalidate selection; only new/changed sources need analysis. Explicit photo refresh bypasses the descriptor cache and preserves manual representative flags. Deleting a journey removes its saved memory file. External gallery edits are picked up through explicit refresh; this does not add newly captured gallery photos to an already imported journey.
