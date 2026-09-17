@@ -53,6 +53,18 @@ You do not need personal location history or photos to try the demo.
 
 Have a **JSON file exported from Google Maps Timeline** and your **trip photos on your phone** ready. JSON is simply the file containing your location history; you do not need to open or edit it.
 
+**Get the JSON file — on Galaxy and other Android devices**
+
+1. On the phone holding your travel history, open **Settings**.
+2. Go to **Location → Location services → Timeline**.
+3. Choose **Export Timeline data → Continue**.
+4. Save to an easy-to-find folder such as **Downloads**, and wait for export to finish.
+5. In My Travel Diary 3D, choose **+ New Travel Story → Choose Timeline JSON File** and select the **`.json` file** you just saved.
+
+Menu names can vary by device. For missing menus or empty history, see [preparation and troubleshooting](docs/INSTALLATION_3D.en.md#timeline-export). The export steps follow [Google's official instructions](https://support.google.com/maps/answer/6258979?co=GENIE.Platform%3DAndroid&hl=en).
+
+**No need to zip or upload your photos.** Keep the original trip photos on your phone, then tap **Enable** on the new-trip screen to allow photo access. If you allow only selected photos, only those can be included. Download any photos stored only in Google Photos or another cloud service to your device first.
+
 Choose **+ New Travel Story → Choose Timeline JSON File**, give the trip a name, and select the first and last days on the calendar. Allow access to the photos you want to use, then tap **Reconstruct Travel Story**. Progress and estimated time remaining appear during preparation.
 
 ### 2. Follow your memories along the route
