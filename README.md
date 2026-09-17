@@ -27,7 +27,7 @@ Android 8.0 이상 · 휴대폰·태블릿 · 현재 공개 버전 **1.0.0-rc12 
 
 | 여행을 모아 보는 첫 화면 | 지도 위에서 즐기는 전체화면 | 완성된 여행 영상의 표지 |
 | :---: | :---: | :---: |
-| <img src="docs/verification-3d/rc10-signed-home.png" width="260" alt="이름순 정렬과 여행별 거리, 사진 수, 방문 기록이 표시된 여행 목록" /> | <img src="docs/verification-3d/rc11-signed-fullscreen.png" width="260" alt="보스턴 예시 경로와 자동차, 날짜, 현재 및 전체 재생 시간이 보이는 세로 전체화면" /> | <img src="docs/verification-3d/rc10-encoded-cover.png" width="260" alt="앱에서 만든 MP4의 시작 화면. 보라색 배경과 금색 테두리, 색종이 장식 위에 여행 제목이 표시됩니다." /> |
+| <img src="docs/verification-3d/rc10-signed-home.png" width="260" alt="이름순 정렬과 여행별 거리, 사진 수, 방문 기록이 표시된 여행 목록" /> | <img src="docs/verification-3d/rc12-controls-portrait.png" width="260" alt="그랜드 캐니언 예시 경로와 캐릭터, 날짜, 작은 재생 조작부가 보이는 세로 전체화면" /> | <img src="docs/verification-3d/rc10-encoded-cover.png" width="260" alt="앱에서 만든 MP4의 시작 화면. 보라색 배경과 금색 테두리, 색종이 장식 위에 여행 제목이 표시됩니다." /> |
 
 *예시 여행 데이터를 사용한 실제 앱 화면과 저장된 영상의 한 장면입니다. 화면 구성과 글꼴은 기기 설정에 따라 달라질 수 있습니다.*
 

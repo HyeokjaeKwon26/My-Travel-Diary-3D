@@ -8,10 +8,18 @@ Seeking now resumes only if playback was running before the gesture. Paused seek
 
 ## RC12 verification
 
-- Three Android cases passed: small-phone/large-font button bounds and wide one-row layout; idle timeout, touch/accessibility reveal, held seeking, paused/playing seek completion, interaction timeout reset and end-of-story behavior; existing fullscreen/rotation/Back position-and-clock regression.
-- A cold-boot emulator System UI ANR obscured the first screenshots despite passing Compose assertions. The system dialog was dismissed and all three cases passed again (116.25 seconds). Only the clean run is used for visual acceptance; an early portrait capture preceded map preparation and will be replaced after packaged-app inspection.
-- [Compact landscape controls](verification-3d/rc12-controls-landscape.png).
-- Release packaging and final installed-build inspection are in progress. Physical S23 Ultra testing remains unavailable.
+- Three Android cases passed on the final UI source (114.375 seconds): small-phone/large-font button bounds, a 96dp inline bar without duplicated navigation insets, and wide one-row layout; idle timeout, touch/accessibility reveal, held seeking, paused/playing seek completion, interaction timeout reset and end-of-story behavior; existing fullscreen/rotation/Back position-and-clock regression.
+- A cold-boot emulator System UI ANR obscured the first screenshots despite passing Compose assertions. The system dialog was dismissed before subsequent runs. An early portrait capture preceded map preparation and was replaced with an actual prepared-map capture. The first release check also caught a missing explicit Material slider API opt-in; this was fixed, and final debug build/lint passed.
+- 13 focused JVM playback clock, speed, tracker and overlay tests passed with no failures/errors/skips. Final lint: 0 errors, 89 warnings, 9 informational findings.
+- [Compact landscape controls](verification-3d/rc12-controls-landscape.png) · [portrait controls](verification-3d/rc12-controls-portrait.png) · [controls hidden during playback](verification-3d/rc12-controls-hidden.png).
+- Optimized universal and ARM64 packages passed resource/JNI contracts, signing-certificate, version/ABI and ZIP/ELF alignment checks. The final universal APK installed in place over the existing app on a 720×1600 emulator; both saved journeys and sorting remained. A real coordinate-tap check confirmed idle controls disappear, map touch reveals them, and pause works (0:08 / 0:12, before the end). The embedded fullscreen button also moved down by the removed duplicate navigation inset. Physical S23 Ultra testing remains unavailable.
+
+## RC12 packages
+
+Application source: `36fe20b` (subsequent changes are documentation/screenshots). Version code 13 / `1.0.0-rc12`, same production signing certificate.
+
+- `My-Travel-Diary-3D-1.0.0-rc12.apk`: 89447551 bytes; SHA-256 `c07bb10516fdb8bf0144aa8c0c581161fe519096910a5d5a4f6e02422476530f`.
+- `My-Travel-Diary-3D-1.0.0-rc12-arm64.apk`: 55934341 bytes; SHA-256 `41485f1fba59129ad6021de10df87ef34422dce66005b1d4a212060ebcc49ce4`.
 
 ---
 
