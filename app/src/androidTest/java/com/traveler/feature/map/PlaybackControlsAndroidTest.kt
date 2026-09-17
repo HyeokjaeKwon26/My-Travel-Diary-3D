@@ -87,12 +87,12 @@ class PlaybackControlsAndroidTest {
     }
 
     @Test fun compactControlsFitSmallPhoneAndWideScreenWithAccessibleTargets() {
-        fun show(width: Int, fontScale: Float) {
+        fun show(width: Int, fontScale: Float, fullscreen: Boolean = true) {
             compose.activityRule.scenario.onActivity { it.setContent { MaterialTheme {
                 val density = LocalDensity.current.density
                 CompositionLocalProvider(LocalDensity provides Density(density, fontScale)) {
                     Box(Modifier.fillMaxSize()) {
-                        PlaybackControls(.4f, "3:18 / 8:16", true, 1f, true, true, true,
+                        PlaybackControls(.4f, "3:18 / 8:16", true, 1f, true, fullscreen, true,
                             {}, {}, {}, {}, {}, {}, {}, {}, {}, Modifier.width(width.dp))
                     }
                 }
@@ -105,6 +105,10 @@ class PlaybackControlsAndroidTest {
             assertTrue("$label is outside controls", node.boundsInRoot.left >= bar.left && node.boundsInRoot.right <= bar.right)
             assertTrue("$label target too small", node.boundsInRoot.height >= 48 * compose.activity.resources.displayMetrics.density - 1)
         }
+        show(320, 1f, fullscreen = false)
+        val inlineBar = compose.onNodeWithTag("playback-controls").fetchSemanticsNode().boundsInRoot
+        assertEquals("Inline controls must not reserve the phone's navigation bar a second time",
+            96 * compose.activity.resources.displayMetrics.density, inlineBar.height, 1f)
         val device = UiDevice.getInstance(InstrumentationRegistry.getInstrumentation())
         compose.activityRule.scenario.onActivity { it.requestedOrientation = android.content.pm.ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE }
         compose.waitUntil(15_000) { device.displayWidth > device.displayHeight }

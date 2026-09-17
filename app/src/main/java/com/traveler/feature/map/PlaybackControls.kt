@@ -36,7 +36,10 @@ internal fun PlaybackControls(
     val pressChanged by rememberUpdatedState(onPressChanged)
     BoxWithConstraints(modifier.fillMaxWidth().testTag("playback-controls")
         .background(Brush.verticalGradient(listOf(Color.Transparent, Color(0xC9101726))))
-        .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal + WindowInsetsSides.Bottom))
+        // The inline map is already inside the diary's safe content area; adding
+        // navigation insets there would create an empty strip above the diary.
+        .then(if (fullscreen) Modifier.windowInsetsPadding(
+            WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal + WindowInsetsSides.Bottom)) else Modifier)
         .padding(horizontal = 8.dp)
         .pointerInput(Unit) {
             // Observe without consuming: sliders/buttons still own their gestures.
