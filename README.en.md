@@ -96,7 +96,9 @@ Trip processing, photo analysis, and video creation happen on your phone. The ap
 
 ## Creator & project
 
-Created by **[HyeokjaeKwon26](https://github.com/HyeokjaeKwon26)**.
+**Hyeokjae Kwon, M.D., Ph.D.**
+
+[Website](https://hyeokjaekwon26.github.io/) · [GitHub](https://github.com/HyeokjaeKwon26)
 
 The project began with [My Travel Diary](https://github.com/HyeokjaeKwon26/My-Travel-Diary) and continues with **My Travel Diary 3D**, bringing terrain and animated characters to your travel memories. The 3D edition is a separate app and can be installed alongside the original 2D version.
 
