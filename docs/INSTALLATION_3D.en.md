@@ -31,9 +31,38 @@ The demo route was created to show the features. It is not a real traveler's GPS
 
 Prepare a **JSON file exported from Google Maps Timeline** and the **photos from that trip on your phone**. The app imports existing journey records; photos alone do not create a new travel route.
 
+<a id="timeline-export"></a>
+
+### A. Save your location history as JSON
+
+First, check the trip dates under **Google Maps → profile picture → Your Timeline**. Export from the phone that holds those records.
+
+1. Open your phone's **Settings** app.
+2. Select **Location → Location services → Timeline**.
+3. Choose **Export Timeline data**, then **Continue**.
+4. Pick a folder you will recognize, such as **Downloads**, and save.
+5. Wait for export to finish. The **`.json` file** is what you will select in the app; do not edit it or split it by travel date.
+
+These steps follow [Google's Android Timeline export guide](https://support.google.com/maps/answer/6258979?co=GENIE.Platform%3DAndroid&hl=en). If your menus differ, consult that guide or search for `Timeline` in your phone settings.
+
+**If you get stuck**
+
+- **No export option:** Update Google Maps and check that this device holds the history. Timeline is unavailable on Android Go.
+- **No records for the trip dates:** Check the account and phone used during the trip. This app cannot recover unrecorded or deleted routes from photos alone. You can try the demo without a personal history file.
+- **Backup is on, but there is no file:** Enabling Timeline backup does not create the JSON file you need to select. Use **Export Timeline data** above.
+- **Can I use Google Takeout on a computer?** For your first trip, use the phone export steps above. Import needs a JSON file containing actual journey records, not a ZIP archive or a screenshot of the map.
+
+### B. Prepare your trip photos
+
+You do not need a separate photo folder or ZIP file. **Keep the original trip photos on the phone where you will use the app.** Photos visible in Google Photos or another service may be stored only in the cloud; download those to the device first.
+
+If the new-trip screen shows **Photos Not Linked**, tap **Enable** and allow photo access. If Android offers access to selected photos only, include the trip photos you want to use. Under **Partial Photo Access**, tap **Change** to allow more photos. The app links accessible photos using capture times and location information. Photos forwarded through messaging apps can lose or change that information, so originals work best.
+
+### C. Create a trip from your files
+
 1. Tap **+ New Travel Story** on the home screen.
 2. When asked, allow access to the photos you want to include. If you allow only selected photos, only those will be available.
-3. Tap **Choose Timeline JSON File** and select your file.
+3. Tap **Choose Timeline JSON File**, open **Downloads** or the folder where you saved the export, and select the **`.json` file**.
 4. Enter a name under **Trip Title (Optional)**, such as `Autumn in New England`.
 5. Tap **Select dates**, select your first and last travel days on the calendar, and tap **Use dates**.
 6. Tap **Reconstruct Travel Story**. Progress and estimated time remaining appear while the trip is prepared. The time needed depends on the amount of data and your device.
