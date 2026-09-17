@@ -1,6 +1,6 @@
 # My Travel Diary 3D 설치·사용 안내
 
-[← 앱 소개로 돌아가기](../README.md)
+[← 앱 소개로 돌아가기](../README.md) · **한국어** · [English](INSTALLATION_3D.en.md)
 
 여행 기록을 가져와 지도 위에서 재생하고 영상으로 저장하는 방법을 안내합니다. 앱에 표시되는 버튼 이름을 함께 적었으니 순서대로 따라 해 보세요.
 
@@ -53,7 +53,7 @@ APK는 Android 앱 설치 파일입니다. **둘 중 하나만** 받으면 됩�
 | 잠시 멈추거나 이어 보기 | 재생·일시정지 버튼 |
 | 처음부터 다시 보기 | 둥근 화살표 버튼 |
 | 원하는 장면으로 이동 | 재생 막대를 원하는 위치로 이동 |
-| 재생 시간 확인 | 막대 위의 `현재 시간 / 전체 시간` 확인 |
+| 재생 시간 확인 | 막대 위나 옆의 `현재 시간 / 전체 시간` 확인 |
 | 천천히 또는 빠르게 보기 | `1×` 속도 버튼 |
 | 음악 켜기·끄기 | 음표 버튼 |
 | 지도를 크게 보기 | 재생 막대의 전체화면 버튼; 가로로 돌려서도 감상 가능 |
@@ -122,4 +122,4 @@ APK는 Android 앱 설치 파일입니다. **둘 중 하나만** 받으면 됩�
 
 ---
 
-[앱 소개](../README.md) · [다운로드](https://github.com/HyeokjaeKwon26/My-Travel-Diary-3D/releases) · [개인정보 안내](PRIVACY_3D.md) · [개발자 문서](DEVELOPMENT.md)
+[앱 소개](../README.md) · [다운로드](https://github.com/HyeokjaeKwon26/My-Travel-Diary-3D/releases) · [Disclaimer](../DISCLAIMER.md) · [개인정보 안내](PRIVACY_3D.md) · [개발자 문서](DEVELOPMENT.md)
