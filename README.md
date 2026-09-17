@@ -96,7 +96,9 @@ Android 휴대폰과 태블릿의 화면 크기에 맞춰 구성을 조절합니
 
 ## 만든이와 프로젝트
 
-제작자: **[HyeokjaeKwon26](https://github.com/HyeokjaeKwon26)**
+**Hyeokjae Kwon, M.D., Ph.D.**
+
+[Website](https://hyeokjaekwon26.github.io/) · [GitHub](https://github.com/HyeokjaeKwon26)
 
 [원래 My Travel Diary](https://github.com/HyeokjaeKwon26/My-Travel-Diary)에서 출발해, 입체 지형과 움직이는 캐릭터로 여행을 되돌아보는 **My Travel Diary 3D**로 이어지는 프로젝트입니다. 3D 버전은 별도 앱이라 기존 2D 앱과 함께 설치할 수 있습니다.
 
