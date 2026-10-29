@@ -8,6 +8,7 @@ data class JourneyFrame(val focus: Vec3, val distance: Double)
 
 /** Pure random-access camera: seeking, frame rate and video encoding cannot change framing. */
 class JourneyCamera(private val scene: SceneGeometry) {
+    private val episodeStarts = scene.timeline.episodes.runningFold(scene.timeline.titleCard?.durationSeconds ?: 0f) { sum, e -> sum + e.durationStorySeconds }
     private val routeRadius = scene.routes.associate { route ->
         val extent = route.xyz.maxOfOrNull { (it-route.xyz.first()).length() } ?: 0.0
         val wide = route.mode == TransportMode.AIRPLANE || route.id.startsWith("bridge_")
@@ -25,7 +26,7 @@ class JourneyCamera(private val scene: SceneGeometry) {
 
     private fun smooth(t:Double)=t.coerceIn(0.0,1.0).let { it*it*(3-2*it) }
     private fun blend(a:JourneyFrame,b:JourneyFrame,f:Double):JourneyFrame {
-        val position=(a.focus*(1-f)+b.focus*f).unit()*(a.focus.length()*(1-f)+b.focus.length()*f)
+        val position=CameraTransition.focus(a.focus,b.focus,f)
         return JourneyFrame(position,a.distance*(1-f)+b.distance*f)
     }
 
@@ -59,6 +60,18 @@ class JourneyCamera(private val scene: SceneGeometry) {
         val settle=smooth(t/.25)
         val departing=smooth((t-.75)/.25)
         val blended=(max(prior,radius)*(1-settle)+radius*settle)*(1-departing)+max(radius,next)*departing
-        return JourneyFrame(scene.motion(state).position, (blended*2.7*fit).coerceIn(.00035,4.0))
+        var focus = scene.motion(state).position
+        val seconds = state.progress * scene.timeline.totalStoryDurationSeconds
+        // Only the camera bridges discontinuous episodes; the recorded route and vehicle are untouched.
+        for (boundary in listOf(index, index + 1).filter { it in 1 until scene.timeline.episodes.size }) {
+            val at = episodeStarts[boundary]
+            val window = minOf(.65f, scene.timeline.episodes[boundary - 1].durationStorySeconds * .2f, scene.timeline.episodes[boundary].durationStorySeconds * .2f)
+            if (window > 0 && seconds >= at - window && seconds <= at + window) {
+                val before = scene.motion(scene.timeline.evaluateAtStoryTime(at - window)).position
+                val after = scene.motion(scene.timeline.evaluateAtStoryTime(at + window)).position
+                focus = CameraTransition.focus(before, after, smooth(((seconds - at + window) / (2 * window)).toDouble()))
+            }
+        }
+        return JourneyFrame(focus, (blended*2.7*fit).coerceIn(.00035,4.0))
     }
 }

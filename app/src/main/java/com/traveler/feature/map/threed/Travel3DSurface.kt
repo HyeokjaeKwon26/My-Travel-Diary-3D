@@ -15,12 +15,13 @@ import javax.microedition.khronos.opengles.GL10
 @Composable
 fun Travel3DSurface(scene: SceneGeometry, state: TravelPlaybackState?, calm: Boolean, modifier: Modifier,
                     mapScale:Double=1.0, internetMaps:Boolean=true,onMapStatus:(String)->Unit={},onReady:(Boolean)->Unit={},
-                    onError: (String) -> Unit) {
+                    qualityMode: QualityMode = QualityMode.AUTO, onQualityStatus: (String) -> Unit = {}, onError: (String) -> Unit) {
     val context=LocalContext.current
     val lifecycle=LocalLifecycleOwner.current.lifecycle
     val errorCallback by rememberUpdatedState(onError)
     val readyCallback by rememberUpdatedState(onReady)
     val mapStatusCallback by rememberUpdatedState(onMapStatus)
+    val qualityStatusCallback by rememberUpdatedState(onQualityStatus)
     val bridge=remember(scene) { SceneBridge(context,scene) { message -> errorCallback(message) } }
     val surface=remember(scene) {
         GLSurfaceView(context).apply {
@@ -40,6 +41,8 @@ fun Travel3DSurface(scene: SceneGeometry, state: TravelPlaybackState?, calm: Boo
     }
     SideEffect {
         bridge.onReady={readyCallback(it)}
+        bridge.quality.mode=qualityMode
+        bridge.qualityStatus={qualityStatusCallback(it)}
         bridge.mapChanged={
             mapStatusCallback(bridge.streetStatus())
             surface.requestRender()
@@ -56,7 +59,7 @@ fun Travel3DSurface(scene: SceneGeometry, state: TravelPlaybackState?, calm: Boo
         lifecycle.addObserver(observer)
         onDispose { lifecycle.removeObserver(observer);bridge.stopNetwork();surface.removeCallbacks(bridge.refresh);surface.queueEvent { bridge.release() };surface.onPause() }
     }
-    val frameRequest=remember(surface) { FrameRequest(surface) }
+    val frameRequest=remember(surface) { FrameRequest(surface) { bridge.quality.frameIntervalMs } }
     DisposableEffect(frameRequest) { onDispose { frameRequest.cancel() } }
     key(surface) {
         AndroidView(factory={surface},modifier=modifier,update={
@@ -85,6 +88,8 @@ private class SceneBridge(val context: android.content.Context,val scene: SceneG
     fun stopNetwork() { resumed=false;streets?.close() }
     val quality=RenderQuality((context.getSystemService(android.content.Context.ACTIVITY_SERVICE) as android.app.ActivityManager).isLowRamDevice)
     var onQuality:(Float)->Unit={}
+    var qualityStatus:(String)->Unit={}
+    private var qualityFrames=0
     private val power=context.getSystemService(android.content.Context.POWER_SERVICE) as android.os.PowerManager
     private var width=1;private var height=1
     private var renderer:TravelGlRenderer?=null
@@ -108,7 +113,8 @@ private class SceneBridge(val context: android.content.Context,val scene: SceneG
             renderer?.render(width,height,state,calm,mapScale,maxOf(width,detailWidth),maxOf(height,detailHeight))
             if(renderer?.mapAvailable==true && firstFrame) { firstFrame=false;main.post { onReady(true) } }
             val thermal=android.os.Build.VERSION.SDK_INT>=29 && power.currentThermalStatus>=android.os.PowerManager.THERMAL_STATUS_MODERATE
-            if(quality.observe((System.nanoTime()-started)/1_000_000.0,thermal)) onQuality(quality.scale)
+            if(quality.observe((System.nanoTime()-started)/1_000_000.0,thermal,power.isPowerSaveMode)) onQuality(quality.scale)
+            if (++qualityFrames % 60 == 0) main.post { qualityStatus("${quality.mode.label} · 해상도 ${(quality.scale*100).toInt()}%${if (thermal) " · 발열로 품질 조절 중" else ""}") }
         }
         catch(e:Exception) { renderer?.release();renderer=null; main.post { onError(e.message ?: "3D rendering failed") } }
     }
@@ -116,13 +122,13 @@ private class SceneBridge(val context: android.content.Context,val scene: SceneG
 }
 
 /** Coalesce updates to 30 fps, retaining the final seek even when playback stops. */
-private class FrameRequest(private val surface: GLSurfaceView) : Runnable {
+private class FrameRequest(private val surface: GLSurfaceView, private val interval: () -> Long = { 34L }) : Runnable {
     private var pending=false
     private var last=0L
     fun request() {
         if(pending) return
         pending=true
-        val delay=(34L-(android.os.SystemClock.uptimeMillis()-last)).coerceAtLeast(0)
+        val delay=(interval()-(android.os.SystemClock.uptimeMillis()-last)).coerceAtLeast(0)
         surface.postDelayed(this,delay)
     }
     override fun run() { pending=false;last=android.os.SystemClock.uptimeMillis();surface.requestRender() }

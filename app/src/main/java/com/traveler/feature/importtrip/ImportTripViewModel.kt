@@ -158,7 +158,7 @@ class ImportTripViewModel(application: Application) : AndroidViewModel(applicati
         return listOf(
             RawMediaCandidate(
                 id = "DEMO_IMG_01",
-                contentUriString = "android.resource://com.traveler.threed/drawable/demo_boston",
+                contentUriString = "android.resource://${com.traveler.BuildConfig.APPLICATION_ID}/drawable/demo_boston",
                 fileName = "IMG_20260701_082015_BostonBackBay.jpg",
                 mimeType = "image/jpeg",
                 exifDateTimeOriginal = "2026:07:01 08:20:15",
@@ -169,7 +169,7 @@ class ImportTripViewModel(application: Application) : AndroidViewModel(applicati
             ),
             RawMediaCandidate(
                 id = "DEMO_IMG_02",
-                contentUriString = "android.resource://com.traveler.threed/drawable/demo_flight",
+                contentUriString = "android.resource://${com.traveler.BuildConfig.APPLICATION_ID}/drawable/demo_flight",
                 fileName = "IMG_20260701_114500_FlightWing.jpg",
                 mimeType = "image/jpeg",
                 exifDateTimeOriginal = "2026:07:01 11:45:00",
@@ -180,7 +180,7 @@ class ImportTripViewModel(application: Application) : AndroidViewModel(applicati
             ),
             RawMediaCandidate(
                 id = "DEMO_IMG_03",
-                contentUriString = "android.resource://com.traveler.threed/drawable/demo_niagara",
+                contentUriString = "android.resource://${com.traveler.BuildConfig.APPLICATION_ID}/drawable/demo_niagara",
                 fileName = "IMG_20260702_113000_NiagaraHorseshoe.jpg",
                 mimeType = "image/jpeg",
                 exifDateTimeOriginal = "2026:07:02 11:30:00",
@@ -191,7 +191,7 @@ class ImportTripViewModel(application: Application) : AndroidViewModel(applicati
             ),
             RawMediaCandidate(
                 id = "DEMO_IMG_04",
-                contentUriString = "android.resource://com.traveler.threed/drawable/demo_unassigned",
+                contentUriString = "android.resource://${com.traveler.BuildConfig.APPLICATION_ID}/drawable/demo_unassigned",
                 fileName = "IMG_20260702_073000_MorningCoffee.jpg",
                 mimeType = "image/jpeg",
                 exifDateTimeOriginal = "2026:07:02 07:30:00",

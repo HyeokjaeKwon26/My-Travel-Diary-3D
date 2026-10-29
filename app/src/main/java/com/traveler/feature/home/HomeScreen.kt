@@ -30,23 +30,15 @@ import kotlinx.coroutines.launch
 fun HomeScreen(
     viewModel: HomeViewModel,
     onNavigateToNewTrip: () -> Unit,
-    onNavigateToTripDetail: (String) -> Unit
+    onNavigateToTripDetail: (String) -> Unit,
+    updateViewModel: com.traveler.feature.update.UpdateViewModel = androidx.lifecycle.viewmodel.compose.viewModel()
 ) {
     val trips by viewModel.trips.collectAsState()
     val sort by viewModel.sort.collectAsState()
     val ascending by viewModel.ascending.collectAsState()
-    val context=androidx.compose.ui.platform.LocalContext.current
-    val scope=rememberCoroutineScope()
-    val restore=androidx.activity.compose.rememberLauncherForActivityResult(androidx.activity.result.contract.ActivityResultContracts.OpenDocument()) { uri ->
-        if(uri!=null) scope.launch {
-            try {
-                val id=com.traveler.core.terrain.TripArchive.restore(context,uri)
-                android.widget.Toast.makeText(context,"Journey restored. Allow photo access to reconnect your gallery.",android.widget.Toast.LENGTH_LONG).show()
-                onNavigateToTripDetail(id)
-            } catch(e:kotlinx.coroutines.CancellationException) { throw e }
-            catch(e:Exception) { android.widget.Toast.makeText(context,e.message ?: "Could not restore journey",android.widget.Toast.LENGTH_LONG).show() }
-        }
-    }
+    val context = androidx.compose.ui.platform.LocalContext.current
+    var showLibrary by remember { mutableStateOf(false) }
+    if (showLibrary) LibraryManagerDialog(onNavigateToTripDetail) { showLibrary = false }
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
@@ -55,7 +47,7 @@ fun HomeScreen(
                 title = {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text(
-                            text = "My Travel Diary 3D",
+                            text = "My Travel Diary 3D New",
                             fontWeight = FontWeight.Bold,
                             fontSize = 20.sp,
                             maxLines = 1,
@@ -64,12 +56,13 @@ fun HomeScreen(
 
                     }
                 },
-                actions = { TextButton(onClick={restore.launch(arrayOf("application/json","application/octet-stream"))}) { Text("Restore") } },
+                actions = { com.traveler.feature.update.UpdateButton(updateViewModel); TaskCenterButton(onNavigateToTripDetail); TextButton(onClick = { showLibrary = true }) { Text("백업") } },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = MaterialTheme.colorScheme.surface
                 )
             )
         },
+        bottomBar = { MigrationButton(enabled = true, onImport = { showLibrary = true }) },
         floatingActionButton = {
             ExtendedFloatingActionButton(
                 onClick = onNavigateToNewTrip,
@@ -137,7 +130,7 @@ fun HomeScreen(
                                 tripPendingDelete = null
                             }
                         ) {
-                            Text("Delete", color = MaterialTheme.colorScheme.error)
+                            Text("휴지통으로 이동", color = MaterialTheme.colorScheme.error)
                         }
                     },
                     dismissButton = {

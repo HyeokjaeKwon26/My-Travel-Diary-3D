@@ -11,6 +11,7 @@ import com.traveler.domain.repository.TripRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
 
 sealed interface TripDetailUiState {
@@ -54,17 +55,29 @@ class TravelDiaryViewModel(application: Application) : AndroidViewModel(applicat
             try {
                 val trip = repository.getTripById(tripId)
                 if (trip != null) {
-                    val prepared = com.traveler.core.media.tripMemoryStore(getApplication()).prepare(trip, refreshPhotos) { done, total ->
+                    val prepared = com.traveler.core.media.tripMemoryStore(getApplication(), tripId).prepare(trip, refreshPhotos) { done, total ->
                         _photoPreparation.value = "사진 구성 준비 중 · $done / $total"
                     }
                     _photoPreparation.value = ""
-                    _uiState.value = TripDetailUiState.Success(prepared)
+                    _uiState.value = TripDetailUiState.Success(kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { com.traveler.core.media.TripMediaFiles.resolve(getApplication(), prepared) })
                 } else {
                     _uiState.value = TripDetailUiState.Error("Trip not found")
                 }
             } catch (e: kotlinx.coroutines.CancellationException) { throw e }
             catch (e: Exception) {
                 _uiState.value = TripDetailUiState.Error(e.message ?: "Failed to load trip")
+            }
+        }
+    }
+
+    init {
+        viewModelScope.launch {
+            var known = com.traveler.core.tasks.TravelTasks.state.value.filter { it.status == "DONE" }.map { it.id }.toSet()
+            com.traveler.core.tasks.TravelTasks.state.collect { tasks ->
+                val completed = tasks.filter { it.status == "DONE" }
+                val changed = completed.any { it.id !in known && currentTripId in it.trips && it.kind in setOf("ADD_MEDIA", "KEEP") }
+                known = completed.map { it.id }.toSet()
+                if (changed) currentTripId?.let { loadTrip(it) }
             }
         }
     }

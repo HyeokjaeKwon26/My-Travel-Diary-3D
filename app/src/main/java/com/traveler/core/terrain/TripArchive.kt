@@ -23,17 +23,23 @@ object TripArchive {
         require(bytes.size<=MAX) { "Journey is too large for a single backup" }
         (context.contentResolver.openOutputStream(uri,"wt") ?: error("Cannot write backup")).use { it.write(bytes) }
     }
-    suspend fun restore(context:Context,uri:Uri):String=withContext(Dispatchers.IO) {
+    suspend fun restore(context:Context,uri:Uri,restoreId:String = UUID.randomUUID().toString(),progress:(Int)->Unit = {}):String=withContext(Dispatchers.IO) {
+        require(runCatching { UUID.fromString(restoreId).toString() == restoreId }.getOrDefault(false))
+        if (TripRepositoryImpl(TravelerDatabase.getDatabase(context)).getTripById(restoreId) != null) return@withContext restoreId
+        val zipped = (context.contentResolver.openInputStream(uri) ?: error("Cannot open backup")).use {
+            it.read() == 0x50 && it.read() == 0x4b
+        }
+        if (zipped) return@withContext com.traveler.core.media.PortableTripArchive.restore(context, uri, ::validate, restoreId, progress)
         val bytes=(context.contentResolver.openInputStream(uri) ?: error("Cannot open backup")).use { input ->
             val out=java.io.ByteArrayOutputStream();val buffer=ByteArray(8192)
             while(true) { val n=input.read(buffer);if(n<0) break;require(out.size()+n<=MAX) { "Backup exceeds 32 MB" };out.write(buffer,0,n) }
             out.toByteArray()
         }
         val archive=Json.decodeFromString<JourneyArchive>(bytes.toString(Charsets.UTF_8))
-        require(archive.format=="MyTravelDiary3D" && archive.version==1) { "Unsupported backup format" }
+        require(archive.format in setOf("MyTravelDiary", "MyTravelDiary3D") && archive.version==1) { "Unsupported backup format" }
         validate(archive.trip)
         // A new id prevents an imported backup from replacing a saved journey.
-        val trip=archive.trip.copy(id=UUID.randomUUID().toString())
+        val trip=com.traveler.core.media.PortableTripArchive.remap(archive.trip, restoreId)
         TripRepositoryImpl(TravelerDatabase.getDatabase(context)).saveTrip(trip)
         trip.id
     }
@@ -55,7 +61,7 @@ object TripArchive {
         }
         fun photos(items:List<MediaItem>) { items.forEach { p ->
             require(p.contentUriString.length<=4096 && (p.contentUriString.startsWith("content://") || p.contentUriString.startsWith("android.resource://"))) { "Backup contains a non-local photo reference" }
-            p.location?.let(::point);p.captureTimezoneId?.let { java.time.ZoneId.of(it) }
+            p.videoClip?.let { require(p.isVideo); it.validate() };p.location?.let(::point);p.captureTimezoneId?.let { java.time.ZoneId.of(it) }
             p.assignedDayIso?.let { java.time.LocalDate.parse(it) }
         } }
         trip.days.forEach { day ->

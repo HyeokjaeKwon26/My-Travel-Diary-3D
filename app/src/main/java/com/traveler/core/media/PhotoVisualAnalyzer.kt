@@ -2,13 +2,8 @@ package com.traveler.core.media
 
 import android.content.Context
 import android.graphics.Bitmap
-import android.graphics.BitmapFactory
-import android.graphics.Matrix
 import android.net.Uri
-import android.os.Build
 import android.provider.MediaStore
-import android.util.Size
-import androidx.exifinterface.media.ExifInterface
 import com.google.android.gms.tasks.Tasks
 import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.label.ImageLabeling
@@ -38,7 +33,7 @@ class PhotoVisualAnalyzer(private val context: Context, private val useCache: Bo
                     val cached=File(directory,"$key.json")
                     if(useCache && cached.isFile) runCatching { json.decodeFromString<PhotoVisualFeatures>(cached.readText()) }.getOrNull()
                         ?.takeIf { it.labelsComputed }?.let { return@mapIndexed item.copy(visualFeatures=it) }
-                    val bitmap=thumbnail(uri) ?: return@mapIndexed item
+                    val bitmap=MediaBitmapDecoder.decode(context,item,256,256) ?: return@mapIndexed item
                     try {
                         val small=Bitmap.createScaledBitmap(bitmap,64,64,true)
                         val pixels=IntArray(64*64);small.getPixels(pixels,0,64,0,0,64,64)
@@ -86,23 +81,5 @@ class PhotoVisualAnalyzer(private val context: Context, private val useCache: Bo
         }.getOrNull().orEmpty()
         return MessageDigest.getInstance("SHA-256").digest("v1:$uri:$evidence:${item.timestampEpochMs}".toByteArray())
             .joinToString("") { "%02x".format(it) }
-    }
-    private fun thumbnail(uri: Uri): Bitmap? {
-        if(Build.VERSION.SDK_INT>=29 && uri.scheme=="content") runCatching {
-            context.contentResolver.loadThumbnail(uri,Size(256,256),null)
-        }.getOrNull()?.let { return it }
-        val options=BitmapFactory.Options().apply { inJustDecodeBounds=true }
-        context.contentResolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it,null,options) }
-        if(options.outWidth<=0 || options.outHeight<=0) return null
-        options.inSampleSize=1
-        while(maxOf(options.outWidth,options.outHeight)/options.inSampleSize>512) options.inSampleSize*=2
-        options.inJustDecodeBounds=false
-        val bitmap=context.contentResolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it,null,options) } ?: return null
-        val exif=runCatching { context.contentResolver.openInputStream(uri)?.use { ExifInterface(it) } }.getOrNull()
-        if(exif!=null && (exif.rotationDegrees!=0 || exif.isFlipped)) {
-            val m=Matrix().apply { if(exif.isFlipped) postScale(-1f,1f);postRotate(exif.rotationDegrees.toFloat()) }
-            return Bitmap.createBitmap(bitmap,0,0,bitmap.width,bitmap.height,m,true).also { if(it!==bitmap) bitmap.recycle() }
-        }
-        return bitmap
     }
 }

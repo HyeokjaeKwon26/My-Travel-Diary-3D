@@ -65,7 +65,7 @@ class TravelVideoEncoder(
         var codecInputSurface: CodecInputSurface? = null
         var reusableBitmap: android.graphics.Bitmap? = null
         var muxer: MediaMuxer? = null
-        var soundtrack: StreamingSoundtrack? = null
+        var soundtrack: ClipAudioMixer? = null
         var isMuxerStarted = false
         var videoTrackIndex = -1
         var audioTrackIndex = -1
@@ -90,8 +90,9 @@ class TravelVideoEncoder(
             videoEncoder.start()
 
             // 2. Configure Audio Encoder (AAC) if includeMusic is true
-            if (includeMusic) {
-                soundtrack=StreamingSoundtrack(context)
+            if (includeMusic || timeline.photoMoments.any { it.photo.videoClip?.let { c -> c.enabled && c.originalVolume > 0f } == true }) {
+                val encodingContext = coroutineContext
+                soundtrack=ClipAudioMixer(context, timeline, includeMusic) { encodingContext.ensureActive(); if (isCancelled.get()) throw kotlinx.coroutines.CancellationException("Video cancelled") }
                 val audioFormat=MediaFormat.createAudioFormat(MediaFormat.MIMETYPE_AUDIO_AAC,44100,2).apply {
                     setInteger(MediaFormat.KEY_AAC_PROFILE,MediaCodecInfo.CodecProfileLevel.AACObjectLC)
                     setInteger(MediaFormat.KEY_BIT_RATE,128_000)
@@ -186,7 +187,7 @@ class TravelVideoEncoder(
 
                     val maxChunkBytes = minOf(inputBuf.capacity(), 4096, ((totalAudioSamples - audioSamplesFed) * 4).coerceAtMost(4096L).toInt())
                     val chunkBytes = ByteArray(maxChunkBytes)
-                    pcm.read(chunkBytes)
+                    pcm.read(chunkBytes, audioSamplesFed)
                     val filled=chunkBytes.size
 
                     val samplesInChunk = filled / 4 // 16-bit stereo = 4 bytes per sample

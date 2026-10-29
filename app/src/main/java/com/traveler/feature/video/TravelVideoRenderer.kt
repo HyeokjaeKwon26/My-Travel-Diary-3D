@@ -2,7 +2,6 @@ package com.traveler.feature.video
 
 import android.content.Context
 import android.graphics.*
-import androidx.exifinterface.media.ExifInterface
 import com.traveler.core.model.MediaItem
 import com.traveler.feature.map.renderer.PlaybackOverlayContent
 import com.traveler.feature.map.renderer.TravelPlaybackState
@@ -40,6 +39,8 @@ class TravelVideoRenderer(
     private val mapRenderer = TravelMapRenderer(basemapStream).apply {
         RegionalBasemapCache.preparedRegionalBasemap?.let { setPreparedRegionalBasemap(it) }
     }
+    private val clips = ClipFrameReader(context)
+    private var frameStorySeconds = 0f
     private val photoBitmapCache = object : android.util.LruCache<String, Bitmap>(24 * 1024 * 1024) {
         override fun sizeOf(key: String, value: Bitmap) = value.allocationByteCount
         override fun entryRemoved(evicted: Boolean, key: String, oldValue: Bitmap, newValue: Bitmap?) {
@@ -98,6 +99,7 @@ class TravelVideoRenderer(
         storyTimeSeconds: Float,
         renderMap: Boolean = true
     ) {
+        frameStorySeconds = storyTimeSeconds
         val totalSec = maxOf(0.001f, timeline.totalStoryDurationSeconds)
         val progress = (storyTimeSeconds / totalSec).coerceIn(0f, 1f)
         val playbackState = timeline.evaluateAtStoryTime(storyTimeSeconds, progress)
@@ -220,75 +222,19 @@ class TravelVideoRenderer(
     }
 
     private fun getOrDecodePhotoBitmap(photo: MediaItem, reqWidth: Int, reqHeight: Int): Bitmap? {
+        if (photo.isVideo && photo.videoClip?.enabled == true) {
+            val moment = timeline.photoMoments.firstOrNull { it.mediaId == photo.id && frameStorySeconds >= it.displayStartStorySeconds && frameStorySeconds < it.displayEndStorySeconds }
+            if (moment != null) return clips.frame(photo, frameStorySeconds - moment.displayStartStorySeconds, reqWidth, reqHeight)
+        }
+
         photoBitmapCache.get(photo.id)?.let { return it }
-        return try {
-            val uri = android.net.Uri.parse(photo.contentUriString)
-
-            // 1. Inspect EXIF orientation metadata
-            var rotationDegrees = 0
-            var isFlipped = false
-            try {
-                context.contentResolver.openInputStream(uri)?.use { stream ->
-                    val exif = ExifInterface(stream)
-                    rotationDegrees = exif.rotationDegrees
-                    isFlipped = exif.isFlipped
-                }
-            } catch (_: Exception) {}
-
-            // 2. Determine sample size based on effective (possibly rotated) dimensions
-            val options = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-            context.contentResolver.openInputStream(uri)?.use {
-                BitmapFactory.decodeStream(it, null, options)
-            }
-            val isSwapped = (rotationDegrees == 90 || rotationDegrees == 270)
-            val effectiveWidth = if (isSwapped) options.outHeight else options.outWidth
-            val effectiveHeight = if (isSwapped) options.outWidth else options.outHeight
-            options.inSampleSize = calculateInSampleSize(effectiveWidth, effectiveHeight, reqWidth, reqHeight)
-            options.inJustDecodeBounds = false
-
-            // 3. Decode sampled bitmap
-            val rawBmp = context.contentResolver.openInputStream(uri)?.use {
-                BitmapFactory.decodeStream(it, null, options)
-            } ?: return null
-
-            // 4. Rotate/flip to correct upright orientation if needed
-            val finalBmp = if (rotationDegrees != 0 || isFlipped) {
-                val matrix = Matrix()
-                if (isFlipped) {
-                    matrix.postScale(-1f, 1f)
-                }
-                if (rotationDegrees != 0) {
-                    matrix.postRotate(rotationDegrees.toFloat())
-                }
-                val rotated = Bitmap.createBitmap(rawBmp, 0, 0, rawBmp.width, rawBmp.height, matrix, true)
-                if (rotated != rawBmp) {
-                    rawBmp.recycle()
-                }
-                rotated
-            } else {
-                rawBmp
-            }
-
-            photoBitmapCache.put(photo.id, finalBmp)
-            finalBmp
-        } catch (_: Exception) {
-            null
+        return com.traveler.core.media.MediaBitmapDecoder.decode(context, photo, reqWidth, reqHeight)?.also {
+            photoBitmapCache.put(photo.id, it)
         }
-    }
-
-    private fun calculateInSampleSize(width: Int, height: Int, reqWidth: Int, reqHeight: Int): Int {
-        var inSampleSize = 1
-        if (height > reqHeight || width > reqWidth) {
-            val halfHeight = height / 2
-            val halfWidth = width / 2
-            while (halfHeight / inSampleSize >= reqHeight && halfWidth / inSampleSize >= reqWidth) {
-                inSampleSize *= 2
-            }
-        }
-        return inSampleSize
     }
 
     fun release() {
+        clips.close()
         photoBitmapCache.evictAll()
         glRenderer?.release()
         glRenderer = null

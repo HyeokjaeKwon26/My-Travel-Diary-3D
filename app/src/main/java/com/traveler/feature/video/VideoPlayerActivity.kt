@@ -26,7 +26,7 @@ class VideoPlayerActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         val file = intent.getStringExtra("videoPath")?.let(::File)
         val exports = TravelVideoExporter.getExportTempDir(this).canonicalFile
-        if (file == null || !file.isFile || file.canonicalFile.parentFile != exports) { finish(); return }
+        if (file == null || !file.isFile || file.canonicalFile.parentFile !in setOf(exports, File(filesDir, "finished_videos").canonicalFile)) { finish(); return }
         resumePosition = savedInstanceState?.getInt("position") ?: 0
         resumePlaying = savedInstanceState?.getBoolean("playing") ?: true
         WindowCompat.setDecorFitsSystemWindows(window, false)

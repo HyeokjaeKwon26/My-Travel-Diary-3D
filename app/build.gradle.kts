@@ -16,13 +16,13 @@ android {
     compileSdk = 36
 
     defaultConfig {
-        applicationId = "com.traveler.threed"
+        applicationId = "com.traveler.threed.next"
         minSdk = 26
         targetSdk = 36
         // Optional device-specific distribution APK; CI/default keeps all supported ABIs.
         providers.gradleProperty("targetAbi").orNull?.let { ndk.abiFilters.add(it) }
-        versionCode = 13
-        versionName = "1.0.0-rc12"
+        versionCode = 2
+        versionName = "2.1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
@@ -140,6 +140,7 @@ dependencies {
     // Media & EXIF
     implementation("androidx.exifinterface:exifinterface:1.3.7")
     implementation("io.coil-kt:coil-compose:2.6.0")
+    implementation("io.coil-kt:coil-video:2.6.0")
 
     // Offline Timezone Polygon Engine (TimeShape / OpenStreetMap boundaries)
     implementation("net.iakovlev:timeshape:2026b.29") {

@@ -31,6 +31,8 @@ fun Map3DLayer(model:TravelMapRenderModel,timeline:TravelStoryTimeline,state:Tra
     var sceneReady by remember { mutableStateOf(false) }
     var use3D by remember { mutableStateOf(true) }
     val preferences = remember { context.getSharedPreferences("scene_preferences", 0) }
+    var qualityMode by remember { mutableStateOf(runCatching { QualityMode.valueOf(preferences.getString("qualityMode", "AUTO")!!) }.getOrDefault(QualityMode.AUTO)) }
+    var qualityStatus by remember { mutableStateOf("자동 품질 조절") }
     val calm=true // RC4 intentionally ignores the older orbit/follow-heading preference.
     val mapScale = 1.0
     var internetMaps by remember { mutableStateOf(preferences.getBoolean("internetMaps",true)) }
@@ -78,7 +80,7 @@ fun Map3DLayer(model:TravelMapRenderModel,timeline:TravelStoryTimeline,state:Tra
     }
     Box(Modifier.fillMaxSize()) {
         if(use3D) {
-            if(scene!=null) Travel3DSurface(scene!!,state,calm,Modifier.fillMaxSize(),mapScale,internetMaps,{mapStatus=it},{sceneReady=it}) {
+            if(scene!=null) Travel3DSurface(scene!!,state,calm,Modifier.fillMaxSize(),mapScale,internetMaps,{mapStatus=it},{sceneReady=it},qualityMode,{qualityStatus=it}) {
                 message=it;use3D=false
             } else CircularProgressIndicator(Modifier.align(Alignment.Center))
         } else fallback()
@@ -100,6 +102,16 @@ fun Map3DLayer(model:TravelMapRenderModel,timeline:TravelStoryTimeline,state:Tra
     }
     if(showOptions) AlertDialog(onDismissRequest=onDismissOptions,title={Text("3D map & terrain")},text={
         Column(Modifier.heightIn(max=480.dp).verticalScroll(rememberScrollState()),verticalArrangement=Arrangement.spacedBy(8.dp)) {
+            Text("재생 품질")
+            QualityMode.entries.forEach { mode -> Row(verticalAlignment = Alignment.CenterVertically) {
+                RadioButton(selected = qualityMode == mode, onClick = { qualityMode = mode; preferences.edit().putString("qualityMode", mode.name).apply() })
+                Text(mode.label)
+            } }
+            Text(qualityStatus, fontSize = 12.sp)
+            Text("발열이 높거나 절전 모드이면 선명하게 설정해도 품질을 낮춥니다. 저장 영상의 해상도 설정은 별도입니다.", fontSize = 11.sp)
+            HorizontalDivider()
+            Text("오프라인 준비 상태")
+            Text("기본 지도: 앱에 포함 · 상세 지형: ${terrainStatus.ready}/${terrainStatus.total} 구역 · 도로 지도: 화면에서 확인한 영역만 저장", fontSize = 12.sp)
             Text(terrainStatus.message)
             Text("Terrain is prepared automatically on Wi-Fi. Saved terrain works offline. Your Timeline and photos stay on this phone.",fontSize=12.sp)
             plan?.let { p ->

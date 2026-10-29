@@ -6,8 +6,8 @@ For installation and everyday use, see the [user guide](INSTALLATION_3D.md). Thi
 
 My Travel Diary 3D is an independent edition of [My Travel Diary](https://github.com/HyeokjaeKwon26/My-Travel-Diary), based on original commit `9bcfb4f`. Original attribution and history are retained under AGPL-3.0.
 
-- Application ID: `com.traveler.threed`; the original `com.traveler` app is separate.
-- RC12: version `1.0.0-rc12`, version code `13`.
+- New application ID: `com.traveler.threed.next`; the original `com.traveler.threed` and 2D apps remain separate.
+- Current New edition: version `2.1.0`, version code `2`; updates New 2.0.0 using the same dedicated key.
 - Minimum Android version: 8.0 (API 26).
 - No automatic import of the original app's private storage.
 
@@ -38,7 +38,7 @@ keyAlias=traveler3d
 keyPassword=YOUR_PASSWORD
 ```
 
-The current maintainer workstation stores the production key outside the checkout at `%USERPROFILE%/.android/traveler3d-release.jks`, with credentials in ignored `keystore.properties`. Back them up securely.
+The current New edition's production key is stored outside the checkout under `%USERPROFILE%/.android/traveler-next-signing`, with credentials in ignored `keystore.properties`. Back it up securely. This key cannot update the original 3D app in place; use the [side-by-side migration procedure](SIDE_BY_SIDE_MIGRATION.md). Current features and update behavior are described in [2.1.0 features](ENHANCEMENTS_2_1.md).
 
 ## Technical references
 
@@ -54,3 +54,7 @@ Older inherited documents and screenshots may describe the original 2D app. They
 Keep the [README](../README.md) and [user guide](INSTALLATION_3D.md) focused on benefits, real screenshots, download links and practical steps. Put implementation details, build commands and test reports in developer documents. When publishing a version, check download links, button labels and screenshot relevance. Label illustrative data and do not promise full offline maps, retained photo originals or device performance that has not been implemented or verified.
 
 Update the [English README](../README.en.md), [English user guide](INSTALLATION_3D.en.md), and both languages of the [Disclaimer](../DISCLAIMER.md) alongside their Korean counterparts. Preserve license and source credits. Creator information must be supported by an identifiable source; do not infer a biography from the account name.
+
+Current source update: [optional media storage and portable ZIP backups](PORTABLE_MEMORIES.md).
+
+In-app update implementation and release metadata generation: [IN_APP_UPDATES.md](IN_APP_UPDATES.md).

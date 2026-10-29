@@ -60,6 +60,9 @@ fun TravelDiaryScreen(
     var viewingGalleryPhotos by remember { mutableStateOf<List<MediaItem>?>(null) }
     var isExportVideoOpen by remember { mutableStateOf(false) }
     var fullscreen by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(false) }
+    val migrationContext = androidx.compose.ui.platform.LocalContext.current
+    val migrationPrefs = remember { migrationContext.getSharedPreferences("migration", 0) }
+    var showMediaStorage by remember(tripId) { mutableStateOf(migrationPrefs.getString("pendingTrip", null) == tripId) }
     var showRefreshConfirmation by remember { mutableStateOf(false) }
     androidx.activity.compose.BackHandler(fullscreen) { fullscreen = false }
     com.traveler.feature.map.PlaybackFullscreenEffect(fullscreen)
@@ -174,6 +177,7 @@ fun TravelDiaryScreen(
                             // Trip Summary Header Card
                             item {
                                 TripSummaryHeader(trip)
+                                OutlinedButton(onClick = { showMediaStorage = true }, modifier = Modifier.fillMaxWidth()) { Text("사진 보관·백업") }
                             }
 
                             // Day by Day Items
@@ -283,6 +287,14 @@ fun TravelDiaryScreen(
                     text = { Text("사진을 다시 분석해 자동 선택을 갱신합니다. 직접 지정한 대표 사진은 유지되며, 사진 수에 따라 시간이 걸릴 수 있습니다.") },
                     confirmButton = { TextButton(onClick = { showRefreshConfirmation = false; viewModel.refreshMemories() }) { Text("다시 고르기") } },
                     dismissButton = { TextButton(onClick = { showRefreshConfirmation = false }) { Text("취소") } })
+            }
+
+            if (showMediaStorage && (uiState as? TripDetailUiState.Success)?.trip?.id == tripId) {
+                TripMediaDialog((uiState as TripDetailUiState.Success).trip) {
+                    showMediaStorage = false
+                    if (migrationPrefs.getString("pendingTrip", null) == tripId) migrationPrefs.edit().remove("pendingTrip").apply()
+                    viewModel.loadTrip(tripId)
+                }
             }
 
             // Fullscreen Immersive Photo Detail Dialog
@@ -874,7 +886,8 @@ fun FullscreenPhotoDialog(
             }
 
             // Main Image
-            AsyncImage(
+            if (photo.isVideo) ClipVideoPreview(photo, photo.videoClip ?: com.traveler.core.model.VideoClip(), Modifier.fillMaxWidth().weight(1f))
+            else AsyncImage(
                 model = photo.contentUriString,
                 contentDescription = photo.fileName,
                 contentScale = ContentScale.Fit,

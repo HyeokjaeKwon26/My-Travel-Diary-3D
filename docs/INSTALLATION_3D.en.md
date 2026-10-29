@@ -1,5 +1,7 @@
 # My Travel Diary 3D — Installation & user guide
 
+> Current source update / 현재 소스 변경: optional app-owned media copies and photo-inclusive ZIP backups are now supported. Statements below about backups without photos refer to the legacy JSON format and previously published APKs. Copies and ZIPs contain original media and metadata; ZIPs are not encrypted. 여행·앱 삭제 시 앱 내부 보관본도 삭제됩니다. [Details / 상세 안내](PORTABLE_MEMORIES.md)
+
 [← App overview](../README.en.md) · [한국어](INSTALLATION_3D.md) · **English**
 
 Import a trip, watch it on the map, and save a video. The steps below use the button names shown in the app; some labels currently appear in Korean.
@@ -119,15 +121,15 @@ The privacy option generalizes place names. It does not hide routes, map labels,
 
 ## 7. Back up and restore trips
 
-Tap **▶ beside the trip title → Back up this journey** to save a backup. To restore it, choose **Restore** on the home screen and select that file.
+In the updated source, open **사진 보관·백업** below the trip summary for local copies, a media-inclusive ZIP, or metadata-only JSON. Use **Restore** on the home screen. The existing **▶ → Back up this journey** action still creates JSON.
 
-**Backups do not contain original photos.** They store trip records and photo references. Keep original photos and Timeline files separately. Backup is not a tool for moving photos to another phone. Before uninstalling the app, back up important journeys and save any finished videos you want to keep.
+**JSON backups omit media files; photo-inclusive ZIP backups include them.** Updated 2D and 3D apps restore ZIPs as new trips. Save ZIP backups and finished MP4s outside the app before uninstalling. See [storage and backup limits](PORTABLE_MEMORIES.md).
 
 ## Questions and troubleshooting
 
 ### Will photos remain in the trip after I delete them?
 
-The app saves photo selections, not archival copies of the images. Deleting a gallery original makes that photo unavailable to the trip. An MP4 already saved with **Save Video** remains playable without the original photos.
+Saved selections and optional local copies are separate. Completed copies work after deleting gallery originals, but uncopied media still require their originals. Deleting the trip or app deletes its copies. Previously saved MP4s remain playable.
 
 ### A photo is missing
 

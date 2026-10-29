@@ -1,6 +1,7 @@
 package com.traveler.data.repository
 
 import androidx.room.withTransaction
+import com.traveler.core.media.allMedia
 import com.traveler.core.common.geo.GeoPoint
 import com.traveler.core.database.TravelerDatabase
 import com.traveler.core.database.entity.*
@@ -150,7 +151,10 @@ class TripRepositoryImpl(
                 isUserLocationOverride = m.isUserLocationOverride,
                 assignedDayIso = m.assignedDayIso,
                 dayAssignmentConfidence = try { DayAssignmentConfidence.valueOf(m.dayAssignmentConfidence) } catch (_: Exception) { DayAssignmentConfidence.UNKNOWN },
-                dayAssignmentProvenance = m.dayAssignmentProvenance
+                dayAssignmentProvenance = m.dayAssignmentProvenance,
+                videoClip = durableOverrides[Pair("VIDEO_CLIP", "$tripId:${m.mediaKey}")]?.overrideValue?.let { value ->
+                    runCatching { json.decodeFromString<VideoClip>(value).also { it.validate() } }.getOrNull()
+                }
             )
         }
 
@@ -202,6 +206,9 @@ class TripRepositoryImpl(
             .associateBy { Pair(it.targetType, it.targetSourceId) }
 
         for (day in trip.days) {
+            for (photo in day.unassignedPhotos) {
+                mediaEntities[photo.id] = mapMediaItemToEntity(trip.id, photo.copy(assignedDayIso = photo.assignedDayIso ?: day.dateIso))
+            }
             for (item in day.items) {
                 when (item) {
                     is TripDayItem.VisitItem -> {
@@ -299,6 +306,12 @@ class TripRepositoryImpl(
             database.visitDao().insertVisits(visitEntities.values.toList())
             database.movementSegmentDao().insertSegments(segmentEntities.values.toList())
             database.tripMediaDao().insertMediaItems(mediaEntities.values.toList())
+            trip.allMedia().forEach { media -> media.videoClip?.let { clip ->
+                clip.validate()
+                database.userOverrideDao().insertOverride(UserOverrideEntity(id = "VIDEO_CLIP:${trip.id}:${media.id}", targetType = "VIDEO_CLIP",
+                    targetSourceId = "${trip.id}:${media.id}", overrideValue = json.encodeToString(clip)))
+            } }
+
         }
     }
 

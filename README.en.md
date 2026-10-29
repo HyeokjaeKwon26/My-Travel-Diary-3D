@@ -1,5 +1,11 @@
 # My Travel Diary 3D
 
+> New 2.1.0 adds batch media backups, restore previews, persistent foreground jobs, media placement, video clips with audio mixing, and optional Wi-Fi update downloads. The 3D edition also adds camera and quality controls. [Feature guide (Korean)](docs/ENHANCEMENTS_2_1.md)
+
+> 2.0.0 New uses a separate app ID and permanent signing key, supports migration checks, and checks for updates on every app start. [Migration](docs/SIDE_BY_SIDE_MIGRATION.md) · [Release workflow](docs/IN_APP_UPDATES.md)
+
+> The New apps support video thumbnails, optional local media copies and photo-inclusive backups. [Usage and limits](docs/PORTABLE_MEMORIES.md)
+
 **[한국어](README.md)** · **English**
 
 ### Watch your travels come to life again.
@@ -8,9 +14,9 @@ The roads you followed. The photos you took along the way. **My Travel Diary 3D*
 
 A little car climbing a mountain road, a plane crossing the sky, a pause to enjoy a favorite photo. Rediscover your trip, one moment at a time.
 
-**[📥 Download for Android](https://github.com/HyeokjaeKwon26/My-Travel-Diary-3D/releases/tag/v1.0.0-rc12)** · **[First-time user guide](docs/INSTALLATION_3D.en.md)** · **[Feedback & issues](https://github.com/HyeokjaeKwon26/My-Travel-Diary-3D/issues)**
+**[📥 Download for Android](https://github.com/HyeokjaeKwon26/My-Travel-Diary-3D/releases/tag/v2.1.0)** · **[First-time user guide](docs/INSTALLATION_3D.en.md)** · **[Feedback & issues](https://github.com/HyeokjaeKwon26/My-Travel-Diary-3D/issues)**
 
-Android 8.0+ · Phones & tablets · Current public version: **1.0.0-rc12 (prerelease)**
+Android 8.0+ · Phones & tablets · Current public version: **2.1.0 New**
 
 <img src="docs/verification-3d/rc12-controls-landscape.png" width="960" alt="Grand Canyon demo playing in landscape fullscreen, with a toy car and route over 3D terrain, a date display, and compact playback controls." />
 
@@ -92,7 +98,7 @@ Choose the story length, portrait or landscape, resolution, and music, then tap 
 
 **Can I delete the original photos and still see them in my trip?**
 
-Please keep the originals. The app saves which photos it selected, but does not make separate copies of the image files. Deleting an original makes that photo unavailable in the diary. An MP4 already saved to your gallery contains the photo frames and remains playable without the originals.
+In the New app, use **사진 보관·백업 → 사진·동영상 모두 앱에 보관** to keep local copies. Successfully copied media remain available without gallery originals. Uncopied media still need the originals and permission. Permanently deleting the trip from Trash or uninstalling the app deletes its copies; export a photo-inclusive backup before changing phones. Saved MP4s remain independent. Older releases of the original app do not include this storage feature.
 
 **Do I need an internet connection?**
 
@@ -117,7 +123,7 @@ The project began with [My Travel Diary](https://github.com/HyeokjaeKwon26/My-Tr
 ## Disclaimer · Before you use the app
 
 - **This app is for reliving trips.** Maps, elevations, place names, and detected travel modes can be inaccurate. Gap connections and character movements include estimates and artistic effects. Do not use them for navigation or as proof of an exact location.
-- **Keep your originals and backups.** Saved photo selections and journey backups do not contain copies of original photos. Deleting originals, changing permissions, or uninstalling the app can make photos or trip records unavailable.
+- **Keep your originals and backups.** Saved selections and JSON backups do not include media files. Optional app-owned copies are removed when the trip is permanently deleted from Trash or the app is uninstalled. Keep a photo-inclusive ZIP backup outside the app.
 - **Review videos before sharing.** Generalizing place names does not hide routes, map labels, or private information inside photos. Map and terrain requests can use network data.
 - **This is a prerelease.** Playback and export performance vary by device. Warranty and liability terms are in sections 15–17 of the [AGPL-3.0 license](LICENSE).
 

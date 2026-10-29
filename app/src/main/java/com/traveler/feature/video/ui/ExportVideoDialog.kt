@@ -51,8 +51,28 @@ fun ExportVideoDialog(
     var includeMusic by remember { mutableStateOf(true) }
     var generalizeHomeAddress by remember { mutableStateOf(true) }
     var exportState by remember { mutableStateOf<VideoExportState>(VideoExportState.Idle) }
-    var currentEncoder by remember { mutableStateOf<com.traveler.feature.video.TravelVideoEncoder?>(null) }
-    var exportJob by remember { mutableStateOf<kotlinx.coroutines.Job?>(null) }
+    remember { com.traveler.core.tasks.TravelTasks.initialize(context); true }
+    val tasks by com.traveler.core.tasks.TravelTasks.state.collectAsState()
+    var activeTaskId by androidx.compose.runtime.saveable.rememberSaveable(trip.id) { mutableStateOf<String?>(null) }
+    val activeTask = tasks.firstOrNull { it.id == activeTaskId } ?: tasks.firstOrNull { it.kind == "VIDEO" && trip.id in it.trips }
+    LaunchedEffect(activeTask) {
+        activeTask ?: return@LaunchedEffect
+        exportState = when (activeTask.status) {
+            "QUEUED", "RUNNING" -> VideoExportState.Encoding(activeTask.progress)
+            "DONE" -> activeTask.outputs.lastOrNull()?.let { path ->
+                val file = File(path)
+                if (file.isFile) {
+                    val seconds = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                        val r = android.media.MediaMetadataRetriever()
+                        try { runCatching { r.setDataSource(path); (r.extractMetadata(android.media.MediaMetadataRetriever.METADATA_KEY_DURATION)?.toFloatOrNull() ?: 0f) / 1000 }.getOrDefault(0f) }
+                        finally { r.release() }
+                    }
+                    VideoExportState.Ready(file, seconds)
+                } else VideoExportState.Error("완성 파일이 없습니다. 다시 제작하세요.")
+            } ?: VideoExportState.Error("완성 파일이 없습니다.")
+            else -> VideoExportState.Error(activeTask.message)
+        }
+    }
     fun saveToGallery(state: VideoExportState.Ready) {
         coroutineScope.launch {
             val uri = TravelVideoExporter.saveVideoToMediaStore(context, state.videoFile, trip.title, trip.startDateIso, trip.endDateIso)
@@ -69,9 +89,6 @@ fun ExportVideoDialog(
         else Toast.makeText(context, "Storage permission is needed to save to the gallery on this Android version", Toast.LENGTH_LONG).show()
     }
 
-    DisposableEffect(Unit) {
-        onDispose { currentEncoder?.cancel(); exportJob?.cancel() }
-    }
 
     val backup = androidx.activity.compose.rememberLauncherForActivityResult(
         androidx.activity.result.contract.ActivityResultContracts.CreateDocument("application/json")
@@ -228,41 +245,13 @@ fun ExportVideoDialog(
                         Button(
                             onClick = {
                                 exportState = VideoExportState.Encoding(0f)
-                                val targetTimeline = when (selectedProfile) {
-                                    StoryDurationProfile.SHORT -> shortTimeline
-                                    StoryDurationProfile.STANDARD -> standardTimeline
-                                    StoryDurationProfile.FULL_STORY -> fullTimeline
-                                }
-                                exportJob = coroutineScope.launch {
-                                    try {
-                                    val file = TravelVideoExporter.exportVideo(
-                                        context = context,
-                                        trip = trip,
-                                        renderModel = renderModel,
-                                        profile = selectedProfile,
-                                        includeMusic = includeMusic,
-                                        resolution = resolution,
-                                        generalizeHomeAddress = generalizeHomeAddress,
-                                        encoderRef = { enc -> currentEncoder = enc },
-                                        onProgress = { p ->
-                                            val started = (exportState as? VideoExportState.Encoding)?.startedMs ?: android.os.SystemClock.elapsedRealtime()
-                                            if (exportJob?.isActive == true) exportState = VideoExportState.Encoding(p, started)
-                                        }
-                                    )
-                                    if (file != null) {
-                                        exportState = VideoExportState.Ready(file, targetTimeline.totalStoryDurationSeconds)
-                                    } else {
-                                        exportState = VideoExportState.Error("Failed to encode video.")
-                                    }
-                                    } catch (e: kotlinx.coroutines.CancellationException) {
-                                        throw e
-                                    } catch (e: Exception) {
-                                        exportState = VideoExportState.Error(e.message ?: "Video export failed")
-                                    } finally {
-                                        currentEncoder = null
-                                    }
+                                runCatching {
+                                    activeTaskId = com.traveler.core.tasks.TravelTasks.enqueue(context, com.traveler.core.tasks.TravelTask(
+                                        kind = "VIDEO", label = "${trip.title} 영상 제작", trips = listOf(trip.id), options = mapOf(
+                                            "profile" to selectedProfile.name, "resolution" to resolution.name,
+                                            "music" to includeMusic.toString(), "privacy" to generalizeHomeAddress.toString())))
+                                }.onFailure { exportState = VideoExportState.Error(it.message ?: "작업을 시작하지 못했습니다.") }
 
-                                }
                             },
                             modifier = Modifier.fillMaxWidth()
                         ) {
@@ -276,6 +265,7 @@ fun ExportVideoDialog(
                             verticalArrangement = Arrangement.spacedBy(12.dp),
                             modifier = Modifier.fillMaxWidth().padding(vertical = 20.dp)
                         ) {
+                            TextButton(onClick = onDismiss) { Text("다른 화면에서도 계속 제작") }
                             Text(
                                 text = "Creating your travel video…",
                                 fontWeight = FontWeight.Bold,
@@ -300,8 +290,7 @@ fun ExportVideoDialog(
                             Spacer(modifier = Modifier.height(8.dp))
                             OutlinedButton(
                                 onClick = {
-                                    currentEncoder?.cancel()
-                                    exportJob?.cancel()
+                                    activeTask?.let { com.traveler.core.tasks.TravelTasks.cancel(context, it) }
                                     exportState = VideoExportState.Idle
                                 },
                                 colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error)

@@ -1,5 +1,7 @@
 # My Travel Diary 3D 설치·사용 안내
 
+> Current source update / 현재 소스 변경: optional app-owned media copies and photo-inclusive ZIP backups are now supported. Statements below about backups without photos refer to the legacy JSON format and previously published APKs. Copies and ZIPs contain original media and metadata; ZIPs are not encrypted. 여행·앱 삭제 시 앱 내부 보관본도 삭제됩니다. [Details / 상세 안내](PORTABLE_MEMORIES.md)
+
 [← 앱 소개로 돌아가기](../README.md) · **한국어** · [English](INSTALLATION_3D.en.md)
 
 여행 기록을 가져와 지도 위에서 재생하고 영상으로 저장하는 방법을 안내합니다. 앱에 표시되는 버튼 이름을 함께 적었으니 순서대로 따라 해 보세요.
@@ -119,15 +121,15 @@ APK는 Android 앱 설치 파일입니다. **둘 중 하나만** 받으면 됩�
 
 ## 7. 여행 백업과 복원
 
-여행 제목 오른쪽 **▶ → Back up this journey**를 눌러 백업 파일을 저장합니다. 복원할 때는 첫 화면의 **Restore**에서 그 파일을 선택합니다.
+현재 개발 버전은 여행 일지 요약 아래 **사진 보관·백업**에서 앱 내부 보관, 사진·동영상 포함 ZIP 백업, 여행 기록만 담는 JSON 백업을 선택합니다. 첫 화면 **Restore**에서 복원합니다. 기존 **▶ → Back up this journey**는 JSON 백업입니다.
 
-**백업에는 원본 사진이 들어 있지 않습니다.** 여행 기록과 사진 연결 정보를 저장하며, 사진 원본과 타임라인 파일은 따로 보관해 주세요. 다른 휴대폰으로 사진까지 옮겨 주는 기능은 아닙니다. 앱을 삭제하기 전에는 필요한 여행을 백업하고 완성된 영상도 사진첩에 저장하세요.
+**JSON 백업에는 미디어 파일이 없고, 사진 포함 ZIP 백업에는 있습니다.** ZIP은 두 앱의 업데이트된 버전에서 새 여행으로 복원하며 기존 여행을 덮어쓰지 않습니다. 앱을 삭제하기 전 ZIP 백업과 필요한 MP4를 앱 밖에 저장하세요. [보관 방법과 용량 제한](PORTABLE_MEMORIES.md)을 확인하세요.
 
 ## 궁금하거나 잘 안될 때
 
 ### 사진을 삭제해도 여행에 남나요?
 
-앱은 사진 선택 결과를 저장하며, 원본 이미지의 보관용 복사본을 만들지 않습니다. 사진첩에서 원본을 지우면 여행에서 해당 사진을 표시할 수 없습니다. 이미 **Save Video**로 저장한 MP4는 원본 사진을 삭제해도 그대로 감상할 수 있습니다.
+선택 결과 저장과 사진 보관은 별개입니다. 보관을 완료한 파일은 원본 삭제 후에도 사용할 수 있지만 보관하지 않은 파일은 원본이 필요합니다. 여행·앱 삭제는 앱 내부 보관본도 삭제합니다. 이미 저장한 MP4는 그대로 감상할 수 있습니다.
 
 ### 사진이 나오지 않아요
 

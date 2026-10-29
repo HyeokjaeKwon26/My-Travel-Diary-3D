@@ -13,6 +13,9 @@ enum class PhotoStoryEligibility {
     /** Capture timestamp is slightly outside parent interval (within tolerance) and clamped */
     CLAMPED_TO_PARENT,
 
+    /** User explicitly placed the media in this visit; this is a display position, not a capture time. */
+    USER_PLACED,
+
     /** Capture timestamp substantially contradicts the matched parent (omitted from playback) */
     INELIGIBLE_TIMESTAMP_CONFLICT,
 
@@ -49,7 +52,7 @@ data class PhotoMomentCluster(
 data class PhotoStoryMoment(
     val mediaId: String,
     val photo: MediaItem,
-    val captureTimestampEpochMs: Long,
+    val captureTimestampEpochMs: Long?,
     val effectiveStoryTimestampEpochMs: Long,
     val parentType: String, // "VISIT" or "MOVEMENT"
     val parentId: String,

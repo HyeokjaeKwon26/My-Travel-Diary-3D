@@ -41,6 +41,10 @@ object PhotoStoryEngine {
             return PhotoStoryEligibility.INELIGIBLE_SCREENSHOT_OR_DOWNLOAD to (photo.timestampEpochMs ?: parentStartEpochMs)
         }
 
+        if (photo.dayAssignmentProvenance == "USER_SELECTED" && photo.isUserLocationOverride &&
+            photo.matchedVisitId != null && photo.assignedDayIso != null) {
+            return PhotoStoryEligibility.USER_PLACED to (parentStartEpochMs + (parentEndEpochMs - parentStartEpochMs).coerceAtLeast(0) / 2)
+        }
         val ts = photo.timestampEpochMs
         if (ts == null || photo.timestampConfidence == TimestampConfidence.UNKNOWN) {
             return PhotoStoryEligibility.INELIGIBLE_TIME_UNCERTAIN to parentStartEpochMs
@@ -85,7 +89,7 @@ object PhotoStoryEngine {
     ): List<PhotoMomentCluster> {
         val eligiblePairs = photos.mapNotNull { p ->
             val (eligibility, effectiveTs) = evaluateEligibility(p, parentStartEpochMs, parentEndEpochMs)
-            if (eligibility == PhotoStoryEligibility.ELIGIBLE || eligibility == PhotoStoryEligibility.CLAMPED_TO_PARENT) {
+            if (eligibility == PhotoStoryEligibility.ELIGIBLE || eligibility == PhotoStoryEligibility.CLAMPED_TO_PARENT || eligibility == PhotoStoryEligibility.USER_PLACED) {
                 Triple(p, eligibility, effectiveTs)
             } else {
                 null
@@ -170,7 +174,7 @@ object PhotoStoryEngine {
 
             val eligibleCount = vPhotos.count { p ->
                 val (el, _) = evaluateEligibility(p, v.startTimestampEpochMs, v.endTimestampEpochMs)
-                el == PhotoStoryEligibility.ELIGIBLE || el == PhotoStoryEligibility.CLAMPED_TO_PARENT
+                el == PhotoStoryEligibility.ELIGIBLE || el == PhotoStoryEligibility.CLAMPED_TO_PARENT || el == PhotoStoryEligibility.USER_PLACED
             }
 
             val durMs = maxOf(0L, v.endTimestampEpochMs - v.startTimestampEpochMs)
@@ -264,7 +268,7 @@ object PhotoStoryEngine {
 
             val eligibleCount = sPhotos.count { p ->
                 val (el, _) = evaluateEligibility(p, s.startTimestampEpochMs, s.endTimestampEpochMs)
-                el == PhotoStoryEligibility.ELIGIBLE || el == PhotoStoryEligibility.CLAMPED_TO_PARENT
+                el == PhotoStoryEligibility.ELIGIBLE || el == PhotoStoryEligibility.CLAMPED_TO_PARENT || el == PhotoStoryEligibility.USER_PLACED
             }
 
             var score = 0
@@ -322,11 +326,11 @@ object PhotoStoryEngine {
         for (cl in allClusters) {
             val rep = cl.representativePhoto
             val (eligibility, effectiveTs) = evaluateEligibility(rep, cl.startTimestampEpochMs, cl.endTimestampEpochMs)
-            if (eligibility == PhotoStoryEligibility.ELIGIBLE || eligibility == PhotoStoryEligibility.CLAMPED_TO_PARENT) {
+            if (eligibility == PhotoStoryEligibility.ELIGIBLE || eligibility == PhotoStoryEligibility.CLAMPED_TO_PARENT || eligibility == PhotoStoryEligibility.USER_PLACED) {
                 val moment = PhotoStoryMoment(
                     mediaId = rep.id,
                     photo = rep,
-                    captureTimestampEpochMs = rep.timestampEpochMs ?: cl.startTimestampEpochMs,
+                    captureTimestampEpochMs = rep.timestampEpochMs,
                     effectiveStoryTimestampEpochMs = effectiveTs,
                     parentType = cl.parentType,
                     parentId = cl.parentId,

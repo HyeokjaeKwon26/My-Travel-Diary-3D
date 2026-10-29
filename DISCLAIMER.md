@@ -1,5 +1,7 @@
 # Disclaimer · 사용 안내 및 면책 고지
 
+> Current source update / 현재 소스 변경: optional app-owned media copies and photo-inclusive ZIP backups are now supported. Statements below about backups without photos refer to the legacy JSON format and previously published APKs. Copies and ZIPs contain original media and metadata; ZIPs are not encrypted. 여행·앱 삭제 시 앱 내부 보관본도 삭제됩니다. [Details / 상세 안내](docs/PORTABLE_MEMORIES.md)
+
 [한국어 앱 소개](README.md) · [English overview](README.en.md)
 
 ## 한국어

@@ -610,7 +610,7 @@ class TravelStoryTimeline private constructor(
                                 item.isUserOverride -> 2.5f
                                 else -> 2.0f
                             }
-                            val duration = maxOf(1.2f, baseDuration * durationMultiplier, vMoments.size*2.6f+.6f)
+                            val duration = maxOf(1.2f, baseDuration * durationMultiplier, maxOf(vMoments.size*2.6f+.6f, vMoments.sumOf { desiredMediaDuration(it.photo).toDouble() + .1 }.toFloat() + .6f))
                             rawEpisodes.add(StoryEpisode.VisitEpisode(visit = item, durationStorySeconds = duration))
                         }
                     }
@@ -618,7 +618,7 @@ class TravelStoryTimeline private constructor(
                         if (resolvedSegments.size <= 10 || item.id in keySegmentIds) {
                             val movement = buildMovementEpisode(item, durationMultiplier)
                             val count = photoMoments.count { it.parentType == "MOVEMENT" && it.parentId == item.id }
-                            rawEpisodes.add(movement.copy(durationStorySeconds=maxOf(movement.durationStorySeconds,count*2.6f+.6f)))
+                            rawEpisodes.add(movement.copy(durationStorySeconds=maxOf(movement.durationStorySeconds,maxOf(count*2.6f+.6f, photoMoments.filter { it.parentType == "MOVEMENT" && it.parentId == item.id }.sumOf { desiredMediaDuration(it.photo).toDouble() + .1 }.toFloat() + .6f))))
                         }
                     }
                 }
@@ -781,16 +781,17 @@ class TravelStoryTimeline private constructor(
                     for ((momentIndex,moment) in epMoments.withIndex()) {
                         val realFrac = ((moment.effectiveStoryTimestampEpochMs - ep.startTimestampEpochMs).toDouble() / epRealDurationMs.toDouble()).toFloat().coerceIn(0.05f, 0.95f)
 
-                        val baseDisplayDuration = if (moment.photo.isRepresentative) 2.5f else 1.8f
+                        val baseDisplayDuration = desiredMediaDuration(moment.photo)
                         val maxAllowedPerMoment = (epDur / epMoments.size) * 0.90f
-                        val displayDuration = minOf(baseDisplayDuration, maxOf(1.0f, maxAllowedPerMoment))
+                        val displayDuration = if (moment.photo.videoClip?.enabled == true) baseDisplayDuration else minOf(baseDisplayDuration, maxOf(1.0f, maxAllowedPerMoment))
 
                         val targetCenterTime = epStart + epDur * realFrac
                         // P2-04 Arrival moment: settle destination visual before photo appears
                         val visitSettlingOffset = if (ep is StoryEpisode.VisitEpisode) minOf(0.35f, epDur * 0.12f) else 0f
                         val earliestStart = maxOf(epStart + visitSettlingOffset, prevEndStoryTime + 0.05f)
                         val remaining = epMoments.size - momentIndex
-                        val latestStart = epStart + epDur - remaining*(displayDuration+.05f)
+                        val remainingDuration = epMoments.drop(momentIndex).sumOf { desiredMediaDuration(it.photo).toDouble() + .05 }.toFloat()
+                        val latestStart = epStart + epDur - remainingDuration
                         val rawDisplayStart = maxOf(earliestStart, minOf(latestStart,targetCenterTime - displayDuration / 2.0f))
                         val rawDisplayEnd = minOf(epStart + epDur, rawDisplayStart + displayDuration)
 
@@ -871,6 +872,9 @@ class TravelStoryTimeline private constructor(
                 episodeStartDistances = startDistances
             )
         }
+
+        private fun desiredMediaDuration(photo: MediaItem): Float = photo.videoClip?.takeIf { photo.isVideo && it.enabled }?.let { it.validate(); it.durationMs / 1000f }
+            ?: if (photo.isRepresentative) 2.5f else 1.8f
 
         private fun buildMovementEpisode(
             item: MovementSegment,

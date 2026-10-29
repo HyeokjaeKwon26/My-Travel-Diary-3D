@@ -12,7 +12,7 @@ Flow:
  3. Execute JVM unit tests (testDebugUnitTest) and parse raw XML results
  4. Execute Android Lint (lintDebug) and parse raw XML results
  5. Execute Gradle assemble (assembleDebug & assembleDebugAndroidTest)
- 6. Clean stale artifacts on Android device/AVD (pm clear com.traveler)
+ 6. Reset only the New test app on an emulator (never the original app)
  7. Execute Connected Android Instrumentation Tests on device/AVD
  8. Execute true external process cold restart (am force-stop -> am start)
  9. Save raw logs to raw/*.log and generate derived/instrumentation-summary.xml
@@ -38,6 +38,8 @@ import datetime
 import xml.etree.ElementTree as ET
 from typing import Dict, List, Tuple, Optional
 
+APP_ID = "com.traveler.threed.next"
+
 REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 VERIFICATION_DIR = os.path.join(REPO_ROOT, "verification")
 OUTPUT_ZIP = os.path.join(REPO_ROOT, "Traveler_Pass21.3_Final.zip")
@@ -55,6 +57,7 @@ EXCLUDE_DIRS = {
 }
 
 EXCLUDE_FILES = {
+    "keystore.properties",
     "local.properties",
     ".DS_Store",
     "Thumbs.db",
@@ -90,6 +93,7 @@ EXCLUDE_FILES = {
 }
 
 EXCLUDE_EXTENSIONS = {
+    ".jks", ".keystore", ".p12", ".pfx",
     ".iml",
     ".hprof",
     ".pyc"
@@ -262,43 +266,29 @@ def parse_lint_results() -> Tuple[int, int]:
     return error_count, warning_count
 
 def clean_device_stale_artifacts(device_id: str, adb_cmd: str):
-    log_event(f"Cleaning stale test artifacts, clearing app state, and waking device {device_id}...")
-    paths_to_clean = [
-        "/sdcard/Download/*.png",
-        "/sdcard/Download/*.txt",
-        "/sdcard/Pictures/*.png",
-        "/sdcard/Pictures/*.txt",
-        "/data/local/tmp/*.png",
-        "/data/local/tmp/*.txt",
-        "/sdcard/Android/data/com.traveler/files/*"
-    ]
-    for p in paths_to_clean:
-        subprocess.run([adb_cmd, "-s", device_id, "shell", "rm", "-f", p], capture_output=True)
-
-    # Clean app data, disable heavy background services, and unlock screen
-    subprocess.run([adb_cmd, "-s", device_id, "shell", "pm", "clear", "com.traveler"], capture_output=True)
-    subprocess.run([adb_cmd, "-s", device_id, "shell", "pm", "disable-user", "--user", "0", "com.android.vending"], capture_output=True)
-    subprocess.run([adb_cmd, "-s", device_id, "shell", "pm", "disable-user", "--user", "0", "com.google.android.googlequicksearchbox"], capture_output=True)
-    subprocess.run([adb_cmd, "-s", device_id, "shell", "input", "keyevent", "KEYCODE_BACK"], capture_output=True)
-    subprocess.run([adb_cmd, "-s", device_id, "shell", "input", "keyevent", "KEYCODE_WAKEUP"], capture_output=True)
-    subprocess.run([adb_cmd, "-s", device_id, "shell", "wm", "dismiss-keyguard"], capture_output=True)
+    if not device_id.startswith("emulator-"):
+        raise ValueError("Destructive test setup is restricted to an emulator")
+    log_event(f"Resetting only the New test app {APP_ID} on {device_id}")
+    subprocess.run([adb_cmd, "-s", device_id, "shell", "pm", "clear", APP_ID], check=True)
+    subprocess.run([adb_cmd, "-s", device_id, "shell", "input", "keyevent", "KEYCODE_WAKEUP"], check=True)
+    subprocess.run([adb_cmd, "-s", device_id, "shell", "wm", "dismiss-keyguard"], check=True)
 
 
 def run_external_process_cold_restart(device_id: str, adb_cmd: str):
     log_event("Executing real external process cold restart (P0-07)...")
     # 1. Force stop process
-    subprocess.run([adb_cmd, "-s", device_id, "shell", "am", "force-stop", "com.traveler"], check=True)
+    subprocess.run([adb_cmd, "-s", device_id, "shell", "am", "force-stop", APP_ID], check=True)
     time.sleep(1.0)
     
     # 2. Verify process is dead
-    pid_proc = subprocess.run([adb_cmd, "-s", device_id, "shell", "pidof", "com.traveler"], capture_output=True, text=True)
+    pid_proc = subprocess.run([adb_cmd, "-s", device_id, "shell", "pidof", APP_ID], capture_output=True, text=True)
     if pid_proc.stdout.strip():
-        log_event(f"Process com.traveler still active ({pid_proc.stdout.strip()}), killing with -9...")
+        log_event(f"Process {APP_ID} still active ({pid_proc.stdout.strip()}), killing with -9...")
         subprocess.run([adb_cmd, "-s", device_id, "shell", "kill", "-9", pid_proc.stdout.strip()], check=False)
         time.sleep(1.0)
 
     # 3. Start MainActivity from fresh cold OS process
-    subprocess.run([adb_cmd, "-s", device_id, "shell", "am", "start", "-n", "com.traveler/.MainActivity"], check=True)
+    subprocess.run([adb_cmd, "-s", device_id, "shell", "am", "start", "-n", f"{APP_ID}/com.traveler.MainActivity"], check=True)
     time.sleep(3.0)
 
     # 4. Capture cold restart screenshot
@@ -312,10 +302,10 @@ def run_connected_android_tests() -> Tuple[str, str, int, int]:
     
     dev_proc = subprocess.run([adb_cmd, "devices"], capture_output=True, text=True, check=True)
     lines = [l.strip() for l in dev_proc.stdout.strip().splitlines() if l.strip()]
-    attached_devices = [l.split()[0] for l in lines[1:] if "device" in l]
+    attached_devices = [l.split()[0] for l in lines[1:] if len(l.split()) > 1 and l.split()[1] == "device" and l.split()[0].startswith("emulator-")]
     
     if not attached_devices:
-        raise RuntimeError("No online Android device/AVD found for connectedDebugAndroidTest! Beta gate failed.")
+        raise RuntimeError("No online test emulator found for connectedDebugAndroidTest! Beta gate failed.")
         
     device_id = attached_devices[0]
     model_proc = subprocess.run([adb_cmd, "-s", device_id, "shell", "getprop", "ro.product.model"], capture_output=True, text=True)
@@ -358,7 +348,7 @@ def run_connected_android_tests() -> Tuple[str, str, int, int]:
     for tc in test_classes:
         log_event(f"Running instrumentation test class: {tc}...")
         am_proc = subprocess.run(
-            [adb_cmd, "-s", device_id, "shell", "am", "instrument", "-w", "-r", "-e", "class", tc, "com.traveler.test/androidx.test.runner.AndroidJUnitRunner"],
+            [adb_cmd, "-s", device_id, "shell", "am", "instrument", "-w", "-r", "-e", "class", tc, f"{APP_ID}.test/androidx.test.runner.AndroidJUnitRunner"],
             capture_output=True, text=True
         )
         
@@ -436,7 +426,7 @@ def pull_memory_and_raw_results() -> Dict[str, str]:
         "memory-after-opening-saved-trip.txt",
         "memory-after-playback-preparation.txt"
     ]
-    dev_paths = ["/sdcard/Download", "/sdcard/Pictures", "/sdcard/Android/data/com.traveler/files", "/data/local/tmp"]
+    dev_paths = ["/sdcard/Download", "/sdcard/Pictures", f"/sdcard/Android/data/{APP_ID}/files", "/data/local/tmp"]
     memory_reports: Dict[str, str] = {}
     
     for mf in mem_files:
@@ -503,7 +493,7 @@ def pull_and_verify_screenshots(device_model: str) -> List[Tuple[str, str]]:
     dev_paths = [
         "/sdcard/Download",
         "/sdcard/Pictures",
-        "/sdcard/Android/data/com.traveler/files",
+        f"/sdcard/Android/data/{APP_ID}/files",
         "/data/local/tmp"
     ]
     

@@ -23,6 +23,13 @@ import com.traveler.feature.trip.TravelDiaryViewModel
 
 class MainActivity : ComponentActivity() {
 
+    private val updateViewModel by viewModels<com.traveler.feature.update.UpdateViewModel>()
+
+    override fun onStart() {
+        super.onStart()
+        updateViewModel.check(automatic = true)
+    }
+
     private val homeViewModel by viewModels<HomeViewModel>()
     private val importViewModel by viewModels<ImportTripViewModel>()
     private val travelDiaryViewModel by viewModels<TravelDiaryViewModel>()
@@ -38,8 +45,10 @@ class MainActivity : ComponentActivity() {
                     TravelerAppNavigation(
                         homeViewModel = homeViewModel,
                         importViewModel = importViewModel,
-                        travelDiaryViewModel = travelDiaryViewModel
+                        travelDiaryViewModel = travelDiaryViewModel,
+                        updateViewModel = updateViewModel
                     )
+                    com.traveler.feature.update.UpdateNotifications(updateViewModel)
                 }
             }
         }
@@ -50,7 +59,8 @@ class MainActivity : ComponentActivity() {
 fun TravelerAppNavigation(
     homeViewModel: HomeViewModel,
     importViewModel: ImportTripViewModel,
-    travelDiaryViewModel: TravelDiaryViewModel
+    travelDiaryViewModel: TravelDiaryViewModel,
+    updateViewModel: com.traveler.feature.update.UpdateViewModel = androidx.lifecycle.viewmodel.compose.viewModel()
 ) {
     val navController = rememberNavController()
 
@@ -58,6 +68,7 @@ fun TravelerAppNavigation(
         composable("home") {
             HomeScreen(
                 viewModel = homeViewModel,
+                updateViewModel = updateViewModel,
                 onNavigateToNewTrip = { navController.navigate("import") },
                 onNavigateToTripDetail = { tripId -> navController.navigate("trip_detail/$tripId") }
             )

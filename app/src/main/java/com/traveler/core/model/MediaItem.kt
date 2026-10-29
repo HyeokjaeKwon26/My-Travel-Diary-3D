@@ -51,7 +51,8 @@ data class MediaItem(
     val dayAssignmentConfidence: DayAssignmentConfidence = DayAssignmentConfidence.UNKNOWN,
     val dayAssignmentProvenance: String? = null,
     val visualFeatures: com.traveler.core.media.PhotoVisualFeatures? = null,
-    val captureEvidence: MediaCaptureEvidence = MediaCaptureEvidence.UNKNOWN
+    val captureEvidence: MediaCaptureEvidence = MediaCaptureEvidence.UNKNOWN,
+    val videoClip: VideoClip? = null
 ) {
     val isVideo: Boolean
         get() = mimeType.startsWith("video/")

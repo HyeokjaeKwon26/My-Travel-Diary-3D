@@ -23,8 +23,11 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
     private val preferences = application.getSharedPreferences("home_sort", 0)
     val sort = MutableStateFlow(TripSort.entries.firstOrNull { it.name == preferences.getString("sort", null) } ?: TripSort.CREATED)
     val ascending = MutableStateFlow(preferences.getBoolean("ascending", false))
-    val trips: StateFlow<List<Trip>> = combine(repository.getAllTrips(), sort, ascending) { trips, sort, ascending ->
-        sort.sorted(trips, ascending)
+    private val trashPrefs = application.getSharedPreferences("trip_trash", 0)
+    private val trashIds = MutableStateFlow(com.traveler.core.media.TripTrash.ids(application))
+    private val trashListener = android.content.SharedPreferences.OnSharedPreferenceChangeListener { _, _ -> trashIds.value = com.traveler.core.media.TripTrash.ids(application) }
+    val trips: StateFlow<List<Trip>> = combine(repository.getAllTrips(), sort, ascending, trashIds) { trips, sort, ascending, trash ->
+        sort.sorted(trips.filterNot { it.id in trash }, ascending)
     }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
@@ -35,15 +38,15 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     init {
+        trashPrefs.registerOnSharedPreferenceChangeListener(trashListener)
         viewModelScope.launch {
             repository.cleanOrphanTripData()
         }
     }
 
     fun deleteTrip(tripId: String) {
-        viewModelScope.launch {
-            repository.deleteTrip(tripId)
-            com.traveler.core.media.tripMemoryStore(getApplication()).delete(tripId)
-        }
+        if (com.traveler.core.tasks.TravelTasks.state.value.any { it.active && tripId in it.trips }) return
+        viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) { com.traveler.core.media.TripTrash.move(getApplication(), tripId) }
     }
+    override fun onCleared() { trashPrefs.unregisterOnSharedPreferenceChangeListener(trashListener); super.onCleared() }
 }
